@@ -99,6 +99,7 @@ http://localhost:5180/anna-apps/deckcraft/dev/index.html#demo
 anna-app validate --strict               # manifest + bundle 静态检查
 npm run smoke                            # 不开浏览器，跑 layout → pptx 并检查结构
 python tools/check-pptx.py out/*.pptx    # 逐页校验图元有没有跑出画布
+node tools/overflow-check.mjs            # 逐页量文本溢出（正常内容 + 压力内容两轮）
 node tools/shot.mjs <url> <name> [页码]   # headless 截图，同时抓 console 报错
 ```
 
@@ -128,6 +129,7 @@ docs/                  DESIGN.md（产品取舍）· PLATFORM-NOTES.md（平台�
 
 - **字体**：导出用 `Microsoft YaHei`，Windows 版 Office 与 macOS 自带；Linux 上会被替换，建议导出后在本机确认一次。
 - **图表预览**：预览用 SVG 近似，导出是 PowerPoint 原生图表，数值与分类一致，细节不完全等价。
+- **字号是算出来的，不是自动缩的**：`layout.js` 按字数预估行数决定字号，PNG 预览和 PPTX 用同一个值。代价是估算偏差（约 3% 余量）要靠 `overflow-check` 兜住，而不是靠 PowerPoint 的 autofit。
 - **单页改写依赖模型**：额度耗尽时该按钮不可用，其余编辑不受影响。
 - **没有 AI 配图**：一张图几十 CU，而这类内容用色块和图表讲更清楚。这是取舍，不是没做完。
 

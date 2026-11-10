@@ -22,6 +22,64 @@ const M = 0.75;
 const CONTENT_TOP = 1.75;
 const CONTENT_BOTTOM = 4.95;
 
+/**
+ * 按字数把字号压到「装得进 N 行」。
+ *
+ * 为什么必须自己算：PptxGenJS 的 fit:'shrink' 只写 normAutofit 标记，真正的
+ * 缩放由 PowerPoint 打开时重算，很多版本不重算就直接溢出——预览看着好好的，
+ * 导出的文件里最后一行会压在别的文本上。字号在这里定死，两边就一致了。
+ *
+ * 宽度估算：中文按 1 个字宽 ≈ 字号，西文与数字按 0.55。不追求精确排版，
+ * 目标只是别溢出，宁可早一点缩。
+ */
+function textUnits(text, bold) {
+  let units = 0;
+  for (const ch of String(text || '')) {
+    // 中文字宽取 1.06 而不是 1：行首缩进、标点避头尾、换行处的空白都会被浪费，
+    // 按 1 算会得出"两行刚好塞满"，实际渲染就溢出——这个余量是量出来的，不是拍的。
+    // 粗体再宽一点。
+    const cjk = /[\u3000-\u9fff\uff00-\uffef]/.test(ch);
+    units += cjk ? (bold ? 1.1 : 1.06) : 0.55;
+  }
+  return units;
+}
+
+export function fitSize(text, { size, width, maxLines = 2, min = 14, bold = true }) {
+  let s = size;
+  while (s > min) {
+    const perLine = (width * 72) / s; // 每行能放几个"中文字宽"
+    const lines = Math.ceil(textUnits(text, bold) / Math.max(1, perLine));
+    if (lines <= maxLines) return s;
+    s = Math.round((s - 1) * 10) / 10;
+  }
+  return min;
+}
+
+/**
+ * 标题类文本的取号策略：优先一行。
+ *
+ * 两行本身不错，但如果第二行只剩一个字（中文很常见），视觉上像排版事故。
+ * 所以先试着缩到"刚好一行"——只要不低于 base 的 70%；压不下去才退回两行。
+ */
+export function fitHeadline(text, { size, width, floor }) {
+  const bottom = Math.max(floor || 16, Math.round(size * 0.7));
+  for (let s = size; s >= bottom; s -= 0.5) {
+    // 留 3% 余量：贴边"刚好一行"在 PowerPoint 里换个字体度量就会折行，
+    // 折出来的孤字比小半号字难看。
+    const perLine = (width * 72) / s;
+    if (textLines(text, { size: s, width }) === 1 && textUnits(text, true) * 1.03 <= perLine) {
+      return { size: s, lines: 1 };
+    }
+  }
+  const two = fitSize(text, { size, width, maxLines: 2, min: bottom });
+  return { size: two, lines: textLines(text, { size: two, width }) };
+}
+
+export function textLines(text, { size, width, bold = true }) {
+  const perLine = (width * 72) / size;
+  return Math.max(1, Math.ceil(textUnits(text, bold) / Math.max(1, perLine)));
+}
+
 /** 标题区：kicker + 标题 + 一段短横线。所有内容页共用，保证节奏一致。 */
 function titleBlock(slide, th) {
   const out = [];
@@ -33,13 +91,19 @@ function titleBlock(slide, th) {
       spacing: 1.6, path: 'kicker'
     });
   }
+  // 两行标题按 26pt 排需要 0.81in，比原来固定的 0.80 高一点就会顶到横线；
+  // 所以高度和横线位置都按实际行数算，而不是写死。
+  const headSize = fitSize(slide.title, { size: 26, width: 8.5, maxLines: 2, min: 19 });
+  const headH = Math.max(0.80, (textLines(slide.title, { size: headSize, width: 8.5 }) * headSize * 1.12) / 72 + 0.06);
   out.push({
     t: 'text',
-    x: M, y: 0.62, w: 8.5, h: 0.74,
-    text: slide.title || '', size: 26, bold: true, color: th.ink,
+    x: M, y: 0.62, w: 8.5, h: headH,
+    text: slide.title || '',
+    size: headSize,
+    bold: true, color: th.ink,
     valign: 'top', lh: 1.12, path: 'title'
   });
-  out.push({ t: 'rect', x: M, y: 1.42, w: 0.72, h: 0.045, fill: th.accent });
+  out.push({ t: 'rect', x: M, y: 0.62 + headH + 0.06, w: 0.72, h: 0.045, fill: th.accent });
   return out;
 }
 
@@ -51,9 +115,20 @@ function bulletRows(items, th, opts = {}) {
   const bottom = opts.bottom ?? CONTENT_BOTTOM;
   const gap = opts.gap ?? 0.12;
   const rowH = (bottom - top - gap * (list.length - 1)) / list.length;
-  const leadSize = opts.leadSize ?? 15;
-  const detailSize = opts.detailSize ?? 11.5;
+  // 同一页里字号必须统一，否则一眼就看出参差；所以取"所有条目都能装下"的那个最小字号。
+  const baseLead = opts.leadSize ?? 15;
+  const baseDetail = opts.detailSize ?? 11.5;
   const leadH = opts.leadH ?? 0.36;
+  const leadSize = Math.min(
+    ...list.map((it) => fitSize(it.lead || it.text, { size: baseLead, width: 8.2, maxLines: 1, min: 11 }))
+  );
+  const detailSize = Math.min(
+    ...list.map((it) => {
+      const avail = Math.max(0.3, rowH - leadH);
+      const maxLines = Math.max(1, Math.floor((avail * 72) / (baseDetail * 1.28)));
+      return fitSize(it.detail || '', { size: baseDetail, width: 8.2, maxLines, min: 9, bold: false });
+    })
+  );
 
   list.forEach((it, i) => {
     const y = top + i * (rowH + gap);
@@ -80,6 +155,10 @@ function bulletRows(items, th, opts = {}) {
 
 const LAYOUTS = {
   cover(slide, th) {
+    const fit = fitHeadline(slide.title, { size: 38, width: 7.9, floor: 24 });
+    const headSize = fit.size;
+    const headH = Math.max(1.42, (fit.lines * headSize * 1.16) / 72 + 0.08);
+    const subY = Math.max(3.34, 1.82 + headH + 0.16);
     const out = [
       { t: 'rect', x: 0, y: 0, w: 0.14, h: SLIDE.h, fill: th.accent },
       {
@@ -88,14 +167,16 @@ const LAYOUTS = {
         path: 'kicker'
       },
       {
-        t: 'text', x: M, y: 1.82, w: 7.9, h: 1.42,
-        text: slide.title || '', size: 38, bold: true, color: th.ink, valign: 'top', lh: 1.16,
+        t: 'text', x: M, y: 1.82, w: 7.9, h: headH,
+        text: slide.title || '',
+        size: headSize,
+        bold: true, color: th.ink, valign: 'top', lh: 1.16,
         path: 'title'
       }
     ];
     if (slide.subtitle) {
       out.push({
-        t: 'text', x: M, y: 3.34, w: 7.4, h: 0.8,
+        t: 'text', x: M, y: subY, w: 7.4, h: 0.8,
         text: slide.subtitle, size: 14, color: th.muted, valign: 'top', lh: 1.3, path: 'subtitle'
       });
     }
@@ -107,6 +188,10 @@ const LAYOUTS = {
   },
 
   section(slide, th) {
+    const fit = fitHeadline(slide.title, { size: 30, width: 8.2, floor: 21 });
+    const headSize = fit.size;
+    const headH = Math.max(1.1, (fit.lines * headSize * 1.15) / 72 + 0.08);
+    const subY = Math.max(3.52, 2.36 + headH + 0.16);
     const out = [
       { t: 'rect', x: 0, y: 0, w: 0.14, h: SLIDE.h, fill: th.accent },
       {
@@ -114,13 +199,15 @@ const LAYOUTS = {
         text: slide.kicker || '', size: 11, bold: true, color: th.accent, spacing: 1.8, path: 'kicker'
       },
       {
-        t: 'text', x: M, y: 2.36, w: 8.2, h: 1.1,
-        text: slide.title || '', size: 30, bold: true, color: th.ink, valign: 'top', lh: 1.15, path: 'title'
+        t: 'text', x: M, y: 2.36, w: 8.2, h: headH,
+        text: slide.title || '',
+        size: headSize,
+        bold: true, color: th.ink, valign: 'top', lh: 1.15, path: 'title'
       }
     ];
     if (slide.subtitle) {
       out.push({
-        t: 'text', x: M, y: 3.52, w: 7.4, h: 0.6,
+        t: 'text', x: M, y: subY, w: 7.4, h: 0.6,
         text: slide.subtitle, size: 12, color: th.muted, valign: 'top', path: 'subtitle'
       });
     }
@@ -236,7 +323,9 @@ const LAYOUTS = {
       { t: 'rect', x: 1.15, y: 2.26, w: 0.86, h: 0.05, fill: th.accent },
       {
         t: 'text', x: 1.15, y: 2.52, w: 7.7, h: 1.2,
-        text: slide.quote || slide.title || '', size: 24, color: th.ink, valign: 'top', lh: 1.34,
+        text: slide.quote || slide.title || '',
+        size: fitSize(slide.quote || slide.title, { size: 24, width: 7.7, maxLines: 3, min: 17 }),
+        color: th.ink, valign: 'top', lh: 1.34,
         path: 'quote'
       }
     ];
@@ -278,17 +367,26 @@ const LAYOUTS = {
   },
 
   end(slide, th) {
+    const head = slide.title || '谢谢';
+    // 标题框高度必须容得下实际行数，否则第二行会压到副标题上：
+    // 30pt × 1.24 行距 × 2 行 ≈ 1.03in，按"一行"给 0.95 就一定会撞。
+    const fit = fitHeadline(head, { size: 30, width: 8.2, floor: 19 });
+    const headSize = fit.size;
+    const headH = Math.max(1.24, (fit.lines * headSize * 1.24) / 72 + 0.08);
+    const subY = Math.max(3.62, 2.18 + headH + 0.16);
     const out = [
-      { t: 'rect', x: 4.5, y: 1.92, w: 1.0, h: 0.05, fill: th.accent },
+      { t: 'rect', x: 4.5, y: 1.86, w: 1.0, h: 0.05, fill: th.accent },
       {
-        t: 'text', x: 1.0, y: 2.3, w: 8.0, h: 0.95,
-        text: slide.title || '谢谢', size: 30, bold: true, color: th.ink, align: 'center', valign: 'top',
+        t: 'text', x: 0.9, y: 2.18, w: 8.2, h: headH,
+        text: head,
+        size: headSize,
+        bold: true, color: th.ink, align: 'center', valign: 'top', lh: 1.24,
         path: 'title'
       }
     ];
     if (slide.subtitle) {
       out.push({
-        t: 'text', x: 1.0, y: 2.98, w: 8.0, h: 0.7,
+        t: 'text', x: 1.0, y: subY, w: 8.0, h: 0.7,
         text: slide.subtitle, size: 12.5, color: th.muted, align: 'center', valign: 'top', lh: 1.35,
         path: 'subtitle'
       });

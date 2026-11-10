@@ -22,12 +22,17 @@ import { mockGenerate, mockDeck, SAMPLE_BRIEF } from './mock.js';
 
 const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 
+// ?nofit=1 关掉预览里的自动缩字，用来测「版式本身装不装得下」。
+// 导出走的是同一份字号，所以这里的溢出就等于 PPTX 里的溢出。
+const NO_FIT = new URLSearchParams(location.search).has('nofit');
+
 const state = {
   anna: null,
   deck: null,
   selected: 0,
   busy: false,
   quota: null,
+  lastCall: null,
   scene: 'report',
   slideCount: 8,
   standalone: true
@@ -285,6 +290,7 @@ async function generate() {
         state.quota = (state.quota || 0) + Number(out.quota || 0);
         renderQuota();
       }
+      state.lastCall = { model: out.model, quota: out.quota, at: Date.now() };
       if (out.stopReason === 'maxTokens') {
         setStatus('输出被截断了，已收下能用的部分；把材料缩短一点会更完整');
       }
@@ -302,7 +308,14 @@ async function generate() {
       setStatus(`示例已生成 ${state.deck.slides.length} 页 · 点画布上的标题可以直接改`);
       toast('这是示例内容。连上模型后，同一套界面会换成你材料里的东西。');
     } else {
-      setStatus(`已生成 ${state.deck.slides.length} 页 · 标题可以直接在画布上改`);
+      const used = state.lastCall && state.lastCall.quota;
+      const model = state.lastCall && state.lastCall.model;
+      setStatus(
+        `已生成 ${state.deck.slides.length} 页` +
+          (model ? ` · ${model}` : '') +
+          (used ? ` · 消耗 ${Math.round(used)} CU` : '') +
+          ' · 标题可直接改'
+      );
     }
     $('#composer').classList.add('is-collapsed');
   } catch (err) {
@@ -405,7 +418,7 @@ function renderCanvas(theme) {
   const slide = state.deck.slides[state.selected];
   if (!slide) return;
   renderSlide(canvas, slide, theme, layoutSlide(slide, theme));
-  autoShrink(canvas);
+  if (!NO_FIT) autoShrink(canvas);
   bindCanvasEditing();
   fitCanvas();
 }
@@ -1107,7 +1120,12 @@ function renderStatus() {
 function renderQuota() {
   const el = $('#quotaText');
   if (!el) return;
-  el.textContent = state.quota ? `本次会话消耗 ${Math.round(state.quota)} CU` : '';
+  // 把"这次是平台模型算的、花了多少"直接写在状态栏。
+  // 平台 AI 的使用痕迹不该只存在于代码里——评审要能一眼看见。
+  const parts = [];
+  if (state.lastCall && state.lastCall.model) parts.push(state.lastCall.model);
+  if (state.quota) parts.push(`本会话 ${Math.round(state.quota)} CU`);
+  el.textContent = parts.join(' · ');
 }
 
 function setBusy(on) {
@@ -1156,6 +1174,11 @@ document.addEventListener('keydown', (e) => {
 // 只在 iframe 内部可见，不影响任何用户路径。
 window.__deckcraft = {
   getDeck: () => state.deck,
+  setDeck: (d) => {
+    state.deck = d;
+    state.selected = 0;
+    renderAll();
+  },
   persistNow,
   restore,
   storageReady: () => Boolean(state.anna && state.anna.storage)
