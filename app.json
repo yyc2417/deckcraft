@@ -1,0 +1,7 @@
+{
+  "name": "DeckCraft",
+  "tagline": "把材料变成能讲的 10 页，导出还能改",
+  "description": "贴一段材料（周报、会议纪要、论文摘要），DeckCraft 先给出整份的叙事骨架——每页标题是一句可以被反驳的判断，而不是「背景」「现状」这类标签。你可以在画布上直接改字、换版式、换主题，这些操作不消耗模型额度。最后导出的 .pptx 里，文本框、形状和图表都是 PowerPoint 原生对象，拿到文件还能继续改数据。",
+  "category": "productivity",
+  "homepage": "https://github.com/yyc2417/deckcraft"
+}

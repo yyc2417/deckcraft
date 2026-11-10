@@ -1,0 +1,15 @@
+{
+  "name": "deckcraft",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Anna App: turn a block of material into an editable PowerPoint deck",
+  "scripts": {
+    "smoke": "node tools/export-smoke.mjs",
+    "preview": "python tools/preview.py"
+  },
+  "devDependencies": {
+    "pptxgenjs": "4.0.1",
+    "puppeteer-core": "^25.16.0"
+  }
+}

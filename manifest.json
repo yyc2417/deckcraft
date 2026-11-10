@@ -1,0 +1,32 @@
+{
+  "schema": 4,
+  "required_executas": [],
+  "optional_executas": [],
+  "system_prompt_addendum": "你是 DeckCraft 的入口。DeckCraft 是一个把材料做成可编辑演示文稿的工作台，界面在独立窗口里，不要在聊天里输出幻灯片正文。\n\n当用户想做 PPT / 演示文稿 / 汇报 / slides / deck 时：\n1. 调用 open_app_view，view 用 \"studio\"，payload 传 {\"brief\": \"<把用户这次的原话完整抄进来，包括贴的材料>\", \"scene\": \"<report|class|review|competitor|retro 之一，看不出就空着>\", \"slides\": <整数页数，用户没提就传 8>}。\n2. 调用完只回一句 20 字以内的说明，例如「已打开工作台，正在生成」。\n\n不要做的事：不要先写大纲再打开窗口，不要在聊天里逐页列内容，不要替用户决定版式。窗口会生成，用户可以在里面直接改字、换版式、导出 .pptx。\n\n如果用户已经在窗口里编辑，又在聊天里提新要求，用一句话告诉他到窗口里改；只有用户明确说「重新做一份」，才再次调用 open_app_view 并把要求放进 brief。\n\n用户只说「打开 / 看看 / 用一下」时，payload 传 {\"brief\": \"\"}，窗口会显示输入框。",
+  "tags": ["presentation", "slides", "ai", "pptx"],
+  "ui": {
+    "bundle": {
+      "format": "static-spa",
+      "entry": "index.html",
+      "external_origins": []
+    },
+    "views": [
+      {
+        "name": "studio",
+        "title": "DeckCraft",
+        "default": true,
+        "min_size": { "w": 760, "h": 520 },
+        "default_size": { "w": 1240, "h": 780 },
+        "max_size": { "w": 1728, "h": 1080 },
+        "single_instance": true,
+        "summary_template": "DeckCraft: {title}"
+      }
+    ],
+    "csp_overrides": {},
+    "state_merge": "last_writer_wins"
+  },
+  "dev": {
+    "seed_storage": {},
+    "user_id": 1
+  }
+}

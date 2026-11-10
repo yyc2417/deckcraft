@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DeckCraft · AI 演示文稿工作台</title>
+    <link rel="stylesheet" href="./css/app.css" />
+    <!-- PptxGenJS 4.0.1（MIT），随 bundle 一起分发：CSP 只允许 'self'，不能用 CDN -->
+    <script src="./vendor/pptxgen.bundle.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <!-- 左：页序 -->
+      <aside class="rail">
+        <div class="rail-head">
+          <span class="rail-title">页序</span>
+          <span class="rail-count" id="railCount">0</span>
+        </div>
+        <div class="thumbs" id="thumbs"></div>
+      </aside>
+
+      <!-- 中：画布 -->
+      <main class="stage">
+        <header class="topbar">
+          <div class="brand">
+            <span class="brand-mark"></span>
+            <span class="brand-name">DeckCraft</span>
+          </div>
+          <div class="doc-title" id="docTitle" contenteditable="true" spellcheck="false"></div>
+          <div class="spacer"></div>
+          <div class="theme-switch" id="themeSwitch"></div>
+          <button class="btn ghost" id="btnNew" title="新建一份">新建</button>
+          <button class="btn primary" id="btnExport" title="导出 .pptx（⌘/Ctrl+S）">导出 PPTX</button>
+        </header>
+
+        <div class="canvas-wrap" id="canvasWrap">
+          <div class="sizer" id="sizer">
+            <div class="canvas" id="canvas"></div>
+          </div>
+        </div>
+
+        <div class="stage-foot">
+          <div class="download-bar" id="downloadBar" hidden></div>
+          <footer class="statusbar">
+            <span class="status-text" id="statusText"></span>
+            <span class="spacer"></span>
+            <span class="quota" id="quotaText"></span>
+          </footer>
+        </div>
+      </main>
+
+      <!-- 右：输入与属性 -->
+      <aside class="inspector">
+        <section class="panel" id="composer">
+          <header class="panel-head">
+            <span class="panel-title">材料</span>
+            <button class="mini ghost" id="btnCollapse" title="收起/展开">⌃</button>
+          </header>
+          <div class="panel-body">
+            <textarea id="brief" class="input brief" rows="5" placeholder="贴一段材料：周报、会议纪要、论文摘要、竞品链接的笔记。&#10;也可以只写一句主题。"></textarea>
+            <div class="chips" id="sceneChips"></div>
+            <div class="row-between">
+              <label class="field-label" for="slideCount">页数</label>
+              <span class="mono" id="slideCountVal">8</span>
+            </div>
+            <input type="range" id="slideCount" min="4" max="14" step="1" class="range" />
+            <button class="btn primary block" id="btnGenerate">生成演示（⌘/Ctrl+Enter）</button>
+            <button class="btn ghost block" id="btnSample">先看看示例</button>
+          </div>
+        </section>
+
+        <section class="panel grow" id="inspector">
+          <header class="panel-head">
+            <span class="panel-title">这一页</span>
+            <span class="badge" id="slideTypeBadge"></span>
+          </header>
+          <div class="panel-body" id="inspectorBody"></div>
+        </section>
+      </aside>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script type="module" src="./js/app.js"></script>
+  </body>
+</html>
