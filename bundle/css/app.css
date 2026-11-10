@@ -185,10 +185,32 @@ html, body {
   place-items: center;
   overflow: hidden;
   padding: 16px;
+  position: relative;
   background:
     radial-gradient(1200px 600px at 50% -10%, #101a26 0%, transparent 70%),
     var(--bg);
 }
+
+.mode-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  max-width: calc(100% - 40px);
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #2a2006;
+  border: 1px solid #6b5210;
+  color: #f2c86b;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mode-banner[hidden] { display: none; }
 
 .sizer { position: relative; }
 
