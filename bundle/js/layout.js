@@ -344,7 +344,7 @@ const LAYOUTS = {
     const categories = (slide.categories || []).slice(0, 8);
     out.push({
       t: 'chart',
-      x: 0.78, y: 1.8, w: 6.3, h: 3.0,
+      x: M, y: 1.86, w: 5.95, h: 2.95,
       kind: slide.kind || 'bar',
       categories,
       series,
@@ -353,14 +353,21 @@ const LAYOUTS = {
       valueLabels: slide.kind !== 'line'
     });
     if (slide.insight) {
-      out.push({ t: 'rect', x: 7.32, y: 1.8, w: 1.93, h: 3.0, rx: 0.04, fill: th.panel, line: th.rule, lw: 0.75 });
+      // 卡片高度跟着文字走：短洞察给一个小卡片，长洞察最多占满图表高度。
+      // 固定 2.95 会让两行字的卡片下面空一大块，看起来像没做完。
+      const iSize = fitSize(slide.insight, { size: 10, width: 1.94, maxLines: 7, min: 8, bold: false });
+      const iLines = textLines(slide.insight, { size: iSize, width: 1.94, bold: false });
+      const cardH = Math.min(2.95, 0.44 + (iLines * iSize * 1.45) / 72 + 0.16);
+      out.push({ t: 'rect', x: 6.95, y: 1.86, w: 2.3, h: cardH, rx: 0.04, fill: th.panel, line: th.rule, lw: 0.75 });
       out.push({
-        t: 'text', x: 7.5, y: 1.96, w: 1.58, h: 0.24,
+        t: 'text', x: 7.14, y: 2.0, w: 1.94, h: 0.24,
         text: '洞察', size: 9, bold: true, color: th.accent, spacing: 1.2
       });
       out.push({
-        t: 'text', x: 7.5, y: 2.26, w: 1.58, h: 2.38,
-        text: slide.insight, size: 9.5, color: th.ink, valign: 'top', lh: 1.42, path: 'insight'
+        t: 'text', x: 7.14, y: 2.3, w: 1.94, h: Math.max(0.5, cardH - 0.52),
+        text: slide.insight,
+        size: iSize,
+        color: th.ink, valign: 'top', lh: 1.45, path: 'insight'
       });
     }
     return out;

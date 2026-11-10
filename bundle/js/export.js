@@ -86,7 +86,7 @@ function addChart(s, pptx, f, theme) {
     x: f.x, y: f.y, w: f.w, h: f.h,
     chartColors: (f.colors || [theme.accent]).map(hex),
     showLegend: Boolean(f.legend) && data.length > 1,
-    legendPos: 'b',
+    legendPos: 't',
     legendColor: hex(theme.muted),
     legendFontSize: 10,
     showValue: Boolean(f.valueLabels) && f.kind !== 'line',

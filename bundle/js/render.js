@@ -12,6 +12,7 @@ import { PT_PER_IN, PX_PER_IN } from './layout.js';
 import { hex } from './theme.js';
 
 const PT2PX = PX_PER_IN / PT_PER_IN;
+const PAD_TOP = 22; // 顶部留给图例
 
 export function renderSlide(host, slide, theme, frames) {
   host.innerHTML = '';
@@ -103,6 +104,10 @@ function chartNode(f, theme) {
   const el = base(f);
   const w = px(f.w);
   const h = px(f.h);
+  // 两条以上系列必须有图例，否则读者无法判断哪条线是什么。
+  // 导出走 PowerPoint 原生图例（legendPos: 't'），这里用等价的两行色块模拟，
+  // 否则预览和文件会长得不一样——那是最容易让人不信任导出结果的地方。
+  if (f.legend && (f.series || []).length > 1) el.appendChild(legendEl(f, theme));
   const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
@@ -113,17 +118,50 @@ function chartNode(f, theme) {
   const cats = f.categories || [];
   const series = f.series || [];
   const values = series[0] ? series[0].values : [];
-  const max = Math.max(1, ...series.flatMap((s) => s.values));
+  // 不能用 Math.max(1, ...)：比率类数据（0.14、0.23）会被压到柱高的 1/4。
+  // 上限按实际最大值放大 8% 留白，全零时给个兜底。
+  const allVals = series.flatMap((se) => se.values).filter((v) => Number.isFinite(v));
+  const max = Math.max(1e-6, ...allVals) * 1.08;
 
   if (f.kind === 'pie') {
     drawPie(svg, values, colors, w, h, cats, theme);
   } else if (f.kind === 'line') {
     drawLine(svg, series, colors, w, h, cats, theme, max);
   } else {
-    drawBars(svg, series, colors, w, h, cats, theme, max);
+    drawBars(svg, series, colors, w, h, cats, theme, max, f.valueLabels);
   }
   el.appendChild(svg);
   return el;
+}
+
+function legendEl(f, theme) {
+  const box = document.createElement('div');
+  box.style.position = 'absolute';
+  box.style.left = '0';
+  box.style.top = '0';
+  box.style.display = 'flex';
+  box.style.gap = '14px';
+  box.style.alignItems = 'center';
+  box.style.fontFamily = `'${theme.font}', sans-serif`;
+  box.style.fontSize = '11px';
+  box.style.color = theme.muted;
+  (f.series || []).forEach((s, i) => {
+    const item = document.createElement('span');
+    item.style.display = 'inline-flex';
+    item.style.alignItems = 'center';
+    item.style.gap = '5px';
+    const dot = document.createElement('span');
+    dot.style.width = '8px';
+    dot.style.height = '8px';
+    dot.style.borderRadius = '2px';
+    dot.style.background = (f.colors || [theme.accent])[i % (f.colors || [theme.accent]).length];
+    const label = document.createElement('span');
+    label.textContent = s.name || '';
+    item.appendChild(dot);
+    item.appendChild(label);
+    box.appendChild(item);
+  });
+  return box;
 }
 
 function axis(svg, w, h, theme, cats) {
@@ -151,9 +189,17 @@ function axis(svg, w, h, theme, cats) {
   return { padB, step };
 }
 
-function drawBars(svg, series, colors, w, h, cats, theme, max) {
+function fmtNum(v) {
+  if (!Number.isFinite(v)) return '';
+  if (Math.abs(v) >= 100) return String(Math.round(v));
+  if (Math.abs(v) >= 10) return v.toFixed(1).replace(/\.0$/, '');
+  if (Math.abs(v) >= 1) return v.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  return v.toFixed(3);
+}
+
+function drawBars(svg, series, colors, w, h, cats, theme, max, valueLabels) {
   const { padB, step } = axis(svg, w, h, theme, cats);
-  const plotH = h - padB - 16;
+  const plotH = h - padB - PAD_TOP - 6;
   const groups = series.length;
   const barW = Math.min(46, (step * 0.62) / groups);
 
@@ -169,14 +215,14 @@ function drawBars(svg, series, colors, w, h, cats, theme, max) {
       r.setAttribute('fill', colors[si % colors.length]);
       r.setAttribute('rx', '2');
       svg.appendChild(r);
-      if (series.length === 1) {
+      if (valueLabels) {
         const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         t.setAttribute('x', x + (barW - 3) / 2);
-        t.setAttribute('y', h - padB - bh - 7);
+        t.setAttribute('y', h - padB - bh - 6);
         t.setAttribute('text-anchor', 'middle');
         t.setAttribute('fill', theme.ink);
-        t.setAttribute('font-size', '11');
-        t.textContent = String(v);
+        t.setAttribute('font-size', series.length > 1 ? '9' : '11');
+        t.textContent = fmtNum(v);
         svg.appendChild(t);
       }
     });
@@ -185,7 +231,7 @@ function drawBars(svg, series, colors, w, h, cats, theme, max) {
 
 function drawLine(svg, series, colors, w, h, cats, theme, max) {
   const { padB, step } = axis(svg, w, h, theme, cats);
-  const plotH = h - padB - 16;
+  const plotH = h - padB - PAD_TOP - 6;
   series.forEach((s, si) => {
     const pts = s.values
       .map((v, i) => `${step * (i + 0.5)},${h - padB - (v / max) * plotH}`)
