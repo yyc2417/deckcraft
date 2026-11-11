@@ -6,7 +6,10 @@
  * 这样下游（渲染、编辑、导出）不需要到处写防御代码。
  */
 
-export const SLIDE_TYPES = ['cover', 'section', 'points', 'compare', 'timeline', 'stat', 'chart', 'quote', 'end'];
+export const SLIDE_TYPES = [
+  'cover', 'section', 'agenda', 'points', 'compare', 'timeline',
+  'table', 'chart', 'stat', 'split', 'quote', 'end'
+];
 
 let seq = 0;
 export function uid(prefix = 's') {
@@ -72,6 +75,44 @@ function normSlide(raw) {
   }
   if (type === 'section') {
     return { ...base, subtitle: str(s.subtitle, LIMITS.subtitle) };
+  }
+  if (type === 'agenda') {
+    const items = arr(s.items || s.sections)
+      .map((it) => (typeof it === 'string'
+        ? { label: str(it, LIMITS.label), hint: '' }
+        : { label: str(it && (it.label || it.title), LIMITS.label), hint: str(it && (it.hint || it.desc), 26) }))
+      .filter((it) => it.label)
+      .slice(0, 6);
+    if (!items.length) return { ...base, type: 'points', points: [] };
+    return { ...base, items };
+  }
+  if (type === 'table') {
+    const columns = arr(s.columns)
+      .map((c) => (typeof c === 'string' ? str(c, 16) : str(c && (c.label || c.title), 16)))
+      .filter(Boolean)
+      .slice(0, 5);
+    let rows = arr(s.rows)
+      .map((r) => arr(r).slice(0, columns.length).map((c) => str(c, 34)))
+      .filter((r) => r.some((c) => c))
+      .slice(0, 7);
+    if (columns.length < 2 || !rows.length) return { ...base, type: 'points', points: normPoints(s.points) };
+    // 补全每行长度，避免渲染时缺列导致错位
+    rows = rows.map((r) => {
+      const full = r.slice();
+      while (full.length < columns.length) full.push('');
+      return full;
+    });
+    return { ...base, columns, rows, note: str(s.note, 60) };
+  }
+  if (type === 'split') {
+    const points = normPoints(s.points || s.body);
+    const visual = {
+      value: str(s.value || s.big, 12),
+      label: str(s.label || s.caption, LIMITS.label),
+      note: str(s.note, 60)
+    };
+    if (!points.length && !visual.value) return { ...base, type: 'points', points: [] };
+    return { ...base, points, visual, side: s.side === 'left' ? 'left' : 'right' };
   }
   if (type === 'quote') {
     return {
@@ -150,6 +191,9 @@ export function normalizeDeck(raw, fallbackTheme = 'slate') {
     if (s.type === 'points') return s.points.length > 0;
     if (s.type === 'timeline') return s.steps.length > 0;
     if (s.type === 'stat') return s.stats.length > 0;
+    if (s.type === 'agenda') return s.items.length > 0;
+    if (s.type === 'table') return s.rows.length > 0;
+    if (s.type === 'split') return s.points.length > 0 || Boolean(s.visual.value);
     return true;
   });
 
@@ -216,6 +260,9 @@ export function slideKindLabel(slide) {
     tight: '要点',
     compare: '对比',
     timeline: '流程',
+    table: '表格',
+    agenda: '目录',
+    split: '图文',
     stat: '数字',
     chart: '图表',
     quote: '引用',

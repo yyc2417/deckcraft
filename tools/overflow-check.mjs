@@ -68,6 +68,14 @@ const stressedTotal = await page.evaluate(() => {
       if (x.note) x.note = `${x.note}，样本量 12 次，仅作参考，不作为结论。`;
     });
     if (s.insight) s.insight = `${s.insight}，这一点还需要再用一轮数据确认。`;
+    (s.items || []).forEach((it) => {
+      if (it.label) it.label = `${it.label}，以及它为什么重要`;
+      if (it.hint) it.hint = `${it.hint}，这一条要在会上讲清楚。`;
+    });
+    if (s.rows) s.rows = s.rows.map((r) => r.map((c) => (c ? `${c}（含人工复核）` : c)));
+    if (s.columns) s.columns = s.columns.map((c) => `${c}与口径`);
+    if (s.visual && s.visual.value) s.visual.value = `${s.visual.value}`;
+    if (s.visual && s.visual.note) s.visual.note = `${s.visual.note}，样本量偏小，仅作方向参考。`;
     if (s.quote) s.quote = `${s.quote}，这句话后来被反复引用，成了团队的共识。`;
   }
   window.__deckcraft.setDeck(d);

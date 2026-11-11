@@ -24,7 +24,7 @@ const SCHEMA_BLOCK = `只输出一个 JSON 对象，不要 markdown 代码块，
   "slides": [ ... ]
 }
 
-slides 里每页从下面 9 种里选一种，字段严格按此命名：
+slides 里每页从下面 12 种里选一种，字段严格按此命名：
 
 1 {"type":"cover","kicker":"场景标签","title":"","subtitle":"","meta":"日期或汇报人"}
 2 {"type":"section","kicker":"01","title":"章节结论句","subtitle":""}
@@ -34,7 +34,10 @@ slides 里每页从下面 9 种里选一种，字段严格按此命名：
 6 {"type":"stat","title":"结论句","stats":[{"value":"12 倍","label":"≤10 字指标","note":"≤30 字口径说明"}]}
 7 {"type":"chart","title":"结论句","kind":"bar|line|pie","categories":[""],"series":[{"name":"","values":[0]}],"insight":"≤40 字，这组数字说明什么"}
 8 {"type":"quote","quote":"≤60 字原话或结论","attribution":"出处"}
-9 {"type":"end","title":"下一步的一句话","subtitle":"≤40 字"}`;
+9  {"type":"agenda","kicker":"目录","title":"","items":[{"label":"≤18 字章节名","hint":"≤26 字一句话"}]}
+10 {"type":"table","title":"结论句","columns":["≤8 字",""],"rows":[["≤16 字",""]],"note":"口径说明"}
+11 {"type":"split","title":"结论句","value":"≤10 字的大数字或关键词","label":"≤18 字它是什么","note":"口径","side":"right","points":[{"lead":"","detail":""}]}
+12 {"type":"end","title":"下一步的一句话","subtitle":"≤40 字"}`;
 
 const RULES = `写作要求（按重要性排序）：
 
@@ -61,7 +64,15 @@ const RULES = `写作要求（按重要性排序）：
 8. chart 页的多个系列必须同量纲。把"小时"和"百分比"画在同一张图上，
    后者会被压成一条贴底的直线，读者什么也看不出来——请拆成两页，或只留一条。
 
-9. 不要出现"本文将""接下来我们"这类元叙述，直接说内容。`;
+9. 不要出现"本文将""接下来我们"这类元叙述，直接说内容。
+
+10. 选版式的判断：
+   - 三个以上的横向对比（方案 / 版本 / 竞品 / 前后差异），用 table，不要用 points 硬凑；
+     最多 5 列 7 行，单元格 ≤16 字，第一列是被比较的对象。
+   - 有一个能概括全场的数字或关键词（时长、倍数、占比），用 split 把它放大，
+     右边配 2-3 条支撑；不要把它塞进 points 的第一条。
+   - 页数 ≥8 时，第 2 页放 agenda，章节名用判断句，不要写"第一部分"；
+     页数 <8 不要放目录。`;
 
 function sceneLine(scene) {
   const found = SCENES.find((s) => s.id === scene || s.name === scene);

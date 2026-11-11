@@ -14,6 +14,8 @@
  * 画布上直接改字靠它回写，没有 path 的文本是纯装饰，只读。
  */
 
+import { mix } from './theme.js';
+
 export const SLIDE = { w: 10, h: 5.625 };
 export const PX_PER_IN = 96;
 export const PT_PER_IN = 72;
@@ -111,22 +113,25 @@ function bulletRows(items, th, opts = {}) {
   const out = [];
   const list = (items || []).filter((it) => it && (it.text || it.lead)).slice(0, opts.max || 4);
   if (!list.length) return out;
+  const left = opts.x ?? M;
+  const width = opts.w ?? 8.2;
   const top = opts.top ?? CONTENT_TOP;
   const bottom = opts.bottom ?? CONTENT_BOTTOM;
   const gap = opts.gap ?? 0.12;
-  const rowH = (bottom - top - gap * (list.length - 1)) / list.length;
+  const spread = (bottom - top - gap * (list.length - 1)) / list.length;
+  const rowH = Math.min(spread, opts.maxRowH ?? 1.15);
   // 同一页里字号必须统一，否则一眼就看出参差；所以取"所有条目都能装下"的那个最小字号。
   const baseLead = opts.leadSize ?? 15;
   const baseDetail = opts.detailSize ?? 11.5;
   const leadH = opts.leadH ?? 0.36;
   const leadSize = Math.min(
-    ...list.map((it) => fitSize(it.lead || it.text, { size: baseLead, width: 8.2, maxLines: 1, min: 11 }))
+    ...list.map((it) => fitSize(it.lead || it.text, { size: baseLead, width, maxLines: 1, min: 11 }))
   );
   const detailSize = Math.min(
     ...list.map((it) => {
       const avail = Math.max(0.3, rowH - leadH);
       const maxLines = Math.max(1, Math.floor((avail * 72) / (baseDetail * 1.28)));
-      return fitSize(it.detail || '', { size: baseDetail, width: 8.2, maxLines, min: 9, bold: false });
+      return fitSize(it.detail || '', { size: baseDetail, width, maxLines, min: 9, bold: false });
     })
   );
 
@@ -134,17 +139,17 @@ function bulletRows(items, th, opts = {}) {
     const y = top + i * (rowH + gap);
     const hasDetail = Boolean(it.detail);
     const leadY = hasDetail ? y : y + Math.max(0, (rowH - leadH) / 2);
-    out.push({ t: 'rect', x: M, y: leadY + 0.11, w: 0.075, h: 0.075, fill: th.accent });
+    out.push({ t: 'rect', x: left, y: leadY + 0.11, w: 0.075, h: 0.075, fill: th.accent });
     out.push({
       t: 'text',
-      x: M + 0.26, y: leadY, w: 8.2, h: leadH,
+      x: left + 0.26, y: leadY, w: width - 0.26, h: leadH,
       text: it.lead || it.text, size: leadSize, bold: true, color: th.ink,
       valign: 'top', lh: 1.2, path: `points.${i}.lead`
     });
     if (hasDetail) {
       out.push({
         t: 'text',
-        x: M + 0.26, y: y + leadH, w: 8.2, h: Math.max(0.3, rowH - leadH),
+        x: left + 0.26, y: y + leadH, w: width - 0.26, h: Math.max(0.3, rowH - leadH),
         text: it.detail, size: detailSize, color: th.muted,
         valign: 'top', lh: 1.28, path: `points.${i}.detail`
       });
@@ -373,6 +378,140 @@ const LAYOUTS = {
     return out;
   },
 
+  agenda(slide, th) {
+    const out = titleBlock(slide, th);
+    const items = (slide.items || []).slice(0, 6);
+    if (!items.length) return out;
+    const top = 1.95;
+    const bottom = 4.86;
+    const rowH = (bottom - top) / items.length;
+    items.forEach((it, i) => {
+      const y = top + i * rowH;
+      out.push({
+        t: 'text', x: M, y: y + 0.06, w: 0.62, h: 0.42,
+        text: String(i + 1).padStart(2, '0'), size: 17, bold: true, color: th.accent, valign: 'top'
+      });
+      out.push({
+        t: 'text', x: M + 0.72, y, w: 7.7, h: 0.42,
+        text: it.label || '',
+        size: fitSize(it.label, { size: 15, width: 7.7, maxLines: 1, min: 12 }),
+        bold: true, color: th.ink, valign: 'top', path: `items.${i}.label`
+      });
+      if (it.hint) {
+        out.push({
+          t: 'text', x: M + 0.72, y: y + 0.40, w: 7.7, h: Math.max(0.22, rowH - 0.46),
+          text: it.hint, size: 10.5, color: th.muted, valign: 'top', path: `items.${i}.hint`
+        });
+      }
+      if (i < items.length - 1) {
+        out.push({ t: 'line', x1: M, y1: y + rowH - 0.04, x2: M + 8.5, y2: y + rowH - 0.04, color: th.rule, width: 0.75 });
+      }
+    });
+    return out;
+  },
+
+  table(slide, th) {
+    const out = titleBlock(slide, th);
+    const cols = slide.columns || [];
+    const rows = slide.rows || [];
+    if (cols.length < 2 || !rows.length) return out;
+
+    const x0 = M;
+    const totalW = 8.5;
+    const top = 1.95;
+    const headH = 0.4;
+    const bottom = slide.note ? 4.6 : 4.88;
+    const rowH = Math.min(0.8, (bottom - (top + headH)) / rows.length);
+
+    // 列宽按内容长度加权：全等比会让"是/否"占掉和"改造周期"一样的宽度
+    const weights = cols.map((c, ci) => {
+      const longest = Math.max(String(c).length * 1.2, ...rows.map((r) => String(r[ci] || '').length));
+      return Math.max(5, Math.min(26, longest));
+    });
+    const sum = weights.reduce((a, b) => a + b, 0);
+    const widths = weights.map((w) => (w / sum) * totalW);
+    const xs = [];
+    let acc = x0;
+    widths.forEach((w) => {
+      xs.push(acc);
+      acc += w;
+    });
+
+    out.push({ t: 'rect', x: x0, y: top, w: totalW, h: headH, fill: th.panel });
+    const cellLines = Math.max(1, Math.floor((rowH * 72 - 6) / (10.5 * 1.24)));
+    cols.forEach((c, i) => {
+      out.push({
+        t: 'text', x: xs[i] + 0.12, y: top, w: widths[i] - 0.2, h: headH,
+        text: c,
+        size: fitSize(c, { size: 11, width: widths[i] - 0.22, maxLines: 1, min: 8.5 }),
+        bold: true, color: th.ink, valign: 'middle'
+      });
+    });
+
+    rows.forEach((row, ri) => {
+      const y = top + headH + ri * rowH;
+      if (ri % 2 === 1) {
+        out.push({ t: 'rect', x: x0, y, w: totalW, h: rowH, fill: mix(th.bg, th.panel, 0.72) });
+      }
+      row.forEach((cell, ci) => {
+        out.push({
+          t: 'text', x: xs[ci] + 0.12, y, w: widths[ci] - 0.2, h: rowH,
+          text: cell,
+          size: fitSize(cell, { size: 10.5, width: widths[ci] - 0.22, maxLines: cellLines, min: 8, bold: false }),
+          color: th.ink, valign: 'middle', path: `rows.${ri}.${ci}`
+        });
+      });
+      out.push({ t: 'line', x1: x0, y1: y, x2: x0 + totalW, y2: y, color: th.rule, width: 0.5 });
+    });
+    const bottomY = top + headH + rows.length * rowH;
+    out.push({ t: 'line', x1: x0, y1: bottomY, x2: x0 + totalW, y2: bottomY, color: th.rule, width: 0.75 });
+
+    if (slide.note) {
+      const noteY = Math.min(4.98, bottomY + 0.14);
+      out.push({ t: 'text', x: x0, y: noteY, w: totalW, h: 0.24, text: slide.note, size: 9, color: th.muted });
+    }
+    return out;
+  },
+
+  split(slide, th) {
+    const out = titleBlock(slide, th);
+    const visualW = 3.1;
+    const gap = 0.4;
+    const vX = slide.side === 'left' ? M : M + 8.5 - visualW;
+    const textX = slide.side === 'left' ? M + visualW + gap : M;
+    const textW = 8.5 - visualW - gap;
+    const vTop = 1.95;
+    const vH = 2.9;
+
+    out.push({ t: 'rect', x: vX, y: vTop, w: visualW, h: vH, rx: 0.04, fill: th.panel, line: th.rule, lw: 0.75 });
+    const v = slide.visual || {};
+    if (v.value) {
+      out.push({
+        t: 'text', x: vX + 0.22, y: vTop + 0.5, w: visualW - 0.44, h: 1.05,
+        text: v.value,
+        size: fitSize(v.value, { size: 44, width: visualW - 0.44, maxLines: 1, min: 20 }),
+        bold: true, color: th.accent, align: 'center', valign: 'middle', path: 'visual.value'
+      });
+    }
+    if (v.label) {
+      out.push({
+        t: 'text', x: vX + 0.22, y: vTop + 1.66, w: visualW - 0.44, h: 0.5,
+        text: v.label, size: 11.5, bold: true, color: th.ink, align: 'center', valign: 'top', path: 'visual.label'
+      });
+    }
+    if (v.note) {
+      out.push({
+        t: 'text', x: vX + 0.22, y: vTop + 2.16, w: visualW - 0.44, h: 0.62,
+        text: v.note, size: 9, color: th.muted, align: 'center', valign: 'top', lh: 1.3, path: 'visual.note'
+      });
+    }
+
+    out.push(...bulletRows(slide.points, th, {
+      x: textX, w: textW, top: 1.98, bottom: 4.86, max: 4, leadSize: 14, detailSize: 11
+    }));
+    return out;
+  },
+
   end(slide, th) {
     const head = slide.title || '谢谢';
     // 标题框高度必须容得下实际行数，否则第二行会压到副标题上：
@@ -408,7 +547,7 @@ export const LAYOUT_IDS = Object.keys(LAYOUTS);
 export function availableLayouts(slide) {
   if (slide && slide.type === 'cover') return ['cover', 'section'];
   if (slide && slide.type === 'end') return ['end'];
-  return ['points', 'tight', 'compare', 'timeline', 'stat', 'quote', 'chart'];
+  return ['points', 'tight', 'compare', 'timeline', 'table', 'split', 'stat', 'chart', 'agenda', 'quote'];
 }
 
 /**

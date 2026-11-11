@@ -512,6 +512,16 @@ function renderInspector() {
   } else if (slide.type === 'stat') {
     body.appendChild(field('标题', areaInput(slide, 'title', 2)));
     body.appendChild(statsEditor(slide));
+  } else if (slide.type === 'agenda') {
+    body.appendChild(field('标题', areaInput(slide, 'title', 2)));
+    body.appendChild(agendaEditor(slide));
+  } else if (slide.type === 'table') {
+    body.appendChild(field('标题', areaInput(slide, 'title', 2)));
+    body.appendChild(tableEditor(slide));
+  } else if (slide.type === 'split') {
+    body.appendChild(field('标题', areaInput(slide, 'title', 2)));
+    body.appendChild(splitEditor(slide));
+    body.appendChild(pointsEditor(slide));
   } else if (slide.type === 'chart') {
     body.appendChild(field('标题', areaInput(slide, 'title', 2)));
     body.appendChild(chartEditor(slide));
@@ -541,9 +551,12 @@ function layoutSelect(slide) {
     ['tight', '要点（紧凑）'],
     ['compare', '两栏对比'],
     ['timeline', '流程'],
+    ['table', '表格'],
+    ['split', '图文'],
     ['stat', '数字卡片'],
-    ['quote', '引用'],
-    ['chart', '图表']
+    ['chart', '图表'],
+    ['agenda', '目录'],
+    ['quote', '引用']
   ];
   const sel = h('select', {
     class: 'input',
@@ -559,11 +572,33 @@ function layoutSelect(slide) {
   return sel;
 }
 
+/** 从任意版式里抽出「要点」列表，供换版式时复用，避免换一下就清空内容。 */
+function pointsOf(slide) {
+  if (slide.points && slide.points.length) return slide.points;
+  if (slide.type === 'table') {
+    return (slide.rows || []).map((r) => ({ lead: r[0] || '', detail: r.slice(1).filter(Boolean).join(' / ') }));
+  }
+  if (slide.type === 'agenda') {
+    return (slide.items || []).map((it) => ({ lead: it.label || '', detail: it.hint || '' }));
+  }
+  if (slide.type === 'timeline') {
+    return (slide.steps || []).map((st) => ({ lead: st.label || '', detail: st.text || '' }));
+  }
+  if (slide.type === 'compare') {
+    return [...(slide.left && slide.left.items || []), ...(slide.right && slide.right.items || [])]
+      .map((t) => ({ lead: t, detail: '' }));
+  }
+  if (slide.type === 'stat') {
+    return (slide.stats || []).map((x) => ({ lead: `${x.value} ${x.label}`.trim(), detail: x.note || '' }));
+  }
+  return [];
+}
+
 /** 版式改写：只搬数据，不调模型。 */
 function convertSlide(slide, target) {
   if (slide.type === target) return;
   const next = { id: slide.id, type: target, kicker: slide.kicker || '', title: slide.title || '' };
-  const points = slide.points || [];
+  const points = pointsOf(slide);
 
   if (target === 'points' || target === 'tight') {
     if (slide.type === 'compare') {
@@ -589,6 +624,19 @@ function convertSlide(slide, target) {
   } else if (target === 'stat') {
     next.stats = (points.length ? points : []).slice(0, 3).map((p) => ({ value: '—', label: p.lead, note: p.detail }));
     if (!next.stats.length) next.stats = [{ value: '42', label: '指标', note: '' }];
+  } else if (target === 'table') {
+    next.columns = ['要点', '说明'];
+    next.rows = (points.length ? points : [{ lead: '第一项', detail: '' }]).slice(0, 7)
+      .map((p) => [p.lead || '', p.detail || '']);
+    next.note = '';
+  } else if (target === 'agenda') {
+    next.items = (points.length ? points : [{ lead: '第一部分' }, { lead: '第二部分' }, { lead: '第三部分' }])
+      .slice(0, 6)
+      .map((p) => ({ label: p.lead || '', hint: p.detail || '' }));
+  } else if (target === 'split') {
+    next.points = points.slice(0, 4);
+    next.visual = { value: '', label: slide.title || '', note: '' };
+    next.side = 'right';
   } else if (target === 'quote') {
     next.quote = slide.title || (points[0] && points[0].lead) || '';
     next.attribution = '';
@@ -899,6 +947,140 @@ function chartEditor(slide) {
     )
   );
   box.appendChild(field('洞察', areaInput(slide, 'insight', 3)));
+  return box;
+}
+
+function agendaEditor(slide) {
+  const box = h('div', { class: 'list-editor' });
+  const list = slide.items || (slide.items = []);
+  list.forEach((it, i) => {
+    box.appendChild(
+      h('div', { class: 'row-card' }, [
+        h('div', { class: 'row-head' }, [
+          h('span', { class: 'row-no', text: String(i + 1).padStart(2, '0') }),
+          h('button', {
+            class: 'mini ghost',
+            onclick: () => {
+              list.splice(i, 1);
+              renderAll();
+            }
+          }, '删')
+        ]),
+        h('input', {
+          class: 'input',
+          value: it.label || '',
+          placeholder: '章节名，≤18 字',
+          oninput: (e) => {
+            it.label = e.target.value;
+            softRefresh();
+          }
+        }),
+        h('input', {
+          class: 'input',
+          value: it.hint || '',
+          placeholder: '一行说明（可空）',
+          oninput: (e) => {
+            it.hint = e.target.value;
+            softRefresh();
+          }
+        })
+      ])
+    );
+  });
+  box.appendChild(
+    h('button', {
+      class: 'mini add',
+      onclick: () => {
+        if (list.length >= 6) return;
+        list.push({ label: '新章节', hint: '' });
+        renderAll();
+      }
+    }, '+ 加一条')
+  );
+  return box;
+}
+
+function tableEditor(slide) {
+  const box = h('div', { class: 'list-editor' });
+  const columns = slide.columns || (slide.columns = ['列一', '列二']);
+  const rows = slide.rows || (slide.rows = []);
+
+  box.appendChild(
+    field(
+      '表头（逗号分隔，2–5 列）',
+      h('input', {
+        class: 'input',
+        value: columns.join('，'),
+        oninput: (e) => {
+          const next = e.target.value.split(/[,，]/).map((x) => x.trim()).filter(Boolean).slice(0, 5);
+          if (next.length < 2) return;
+          slide.columns = next;
+          // 列数变了就补齐/截断每行，避免错位
+          slide.rows = (slide.rows || []).map((r) => {
+            const out = r.slice(0, next.length);
+            while (out.length < next.length) out.push('');
+            return out;
+          });
+          softRefresh();
+        }
+      })
+    )
+  );
+
+  const textarea = h('textarea', {
+    class: 'input',
+    rows: String(Math.min(9, Math.max(3, rows.length + 1))),
+    placeholder: '每行一条，单元格用 | 分隔\n串行流程 | 5 天 | 3 个人',
+    oninput: (e) => {
+      slide.rows = e.target.value
+        .split(/\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .slice(0, 7)
+        .map((line) => {
+          const cells = line.split(/[|｜\t]/).map((c) => c.trim()).slice(0, slide.columns.length);
+          while (cells.length < slide.columns.length) cells.push('');
+          return cells;
+        });
+      softRefresh();
+    },
+    onblur: () => {
+      renderAll();
+      saveDeck();
+    }
+  }, rows.map((r) => r.join(' | ')).join('\n'));
+  box.appendChild(field('数据行', textarea));
+
+  box.appendChild(field('脚注', textInput(slide, 'note', '口径说明，可空')));
+  return box;
+}
+
+function splitEditor(slide) {
+  const v = slide.visual || (slide.visual = { value: '', label: '', note: '' });
+  const box = h('div', { class: 'list-editor' });
+  box.appendChild(
+    h('div', { class: 'row-line' }, [
+      h('button', {
+        class: 'mini',
+        onclick: () => {
+          slide.side = slide.side === 'left' ? 'right' : 'left';
+          renderAll();
+        }
+      }, slide.side === 'left' ? '视觉块在左 ⇄' : '视觉块在右 ⇄')
+    ])
+  );
+  box.appendChild(field('大数字 / 关键词', h('input', {
+    class: 'input', value: v.value || '', placeholder: '例：4 小时 / −68%',
+    oninput: (e) => { v.value = e.target.value; softRefresh(); }
+  })));
+  box.appendChild(field('它是什么', h('input', {
+    class: 'input', value: v.label || '', placeholder: '例：平均完结时长',
+    oninput: (e) => { v.label = e.target.value; softRefresh(); }
+  })));
+  box.appendChild(field('口径', h('input', {
+    class: 'input', value: v.note || '', placeholder: '例：样本 1,842 单',
+    oninput: (e) => { v.note = e.target.value; softRefresh(); }
+  })));
   return box;
 }
 
