@@ -10,6 +10,7 @@
  */
 
 import { writeFile } from 'node:fs/promises';
+import * as fs from 'node:fs';
 import puppeteer from 'puppeteer-core';
 import { existsSync } from 'node:fs';
 
@@ -75,11 +76,25 @@ const result = await frame.evaluate(() => ({
   slideTypes: Array.from(document.querySelectorAll('#thumbs .thumb')).length
 }));
 
+// RECORD=frames_dir → 在主流程的确定节点截帧（填材料前/生成中/生成完/翻页），
+// 拼成演示 GIF。评审在 pending_review 期间装不了 draft，这是唯一确定的"看得见产品在跑"的证据。
+// 不用后台定时器：实测 screenshot 在生成过程中会失败，只有节点截图可靠。
+const framesDir = process.env.RECORD || '';
+let frameNo = 0;
+async function snap(label) {
+  if (!framesDir) return;
+  fs.mkdirSync(framesDir, { recursive: true });
+  try {
+    await page.screenshot({ path: `${framesDir}/f${String(frameNo++).padStart(3, '0')}-${label}.png` });
+  } catch (_) { /* 失败不致命 */ }
+}
+
 // THUMBS=4,7 → 同一次生成里截多页，保证商店图内容前后一致
 const wanted = String(process.env.THUMBS || process.env.THUMB || '').split(',').map((x) => Number(x)).filter(Boolean);
 for (const n of wanted) {
   await frame.evaluate((i) => document.querySelector(`#thumbs .thumb:nth-child(${i})`).click(), n);
   await new Promise((r) => setTimeout(r, 600));
+  await snap(`page-${n}`);
   const el = await page.$('iframe');
   if (el) await el.screenshot({ path: `out/listing-${n}.png` });
 }
@@ -88,6 +103,7 @@ if (wanted.length) {
   await new Promise((r) => setTimeout(r, 500));
 }
 
+await snap('done');
 await page.screenshot({ path: 'out/real-test.png' });
 // 只截 iframe：商店图不要 mock dashboard 的外壳
 const frameEl = await page.$('iframe');

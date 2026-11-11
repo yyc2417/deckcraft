@@ -8,6 +8,8 @@
 | App | `DeckCraft` · `@yyc2417/deckcraft` · app_id 261 |
 | 状态 | v1.0.3 已提交审核（2026-11-11 10:52）；通过后 `anna-app apps release 1.0.3` 上线 |
 
+![真实生成录屏：贴入材料 → 平台模型生成 8 页 → 翻页检查](assets/listing/demo.gif)
+
 ![DeckCraft 编辑器](assets/listing/shot-1-editor.png)
 
 ---
