@@ -1,0 +1,41 @@
+# 交付信息（发给评审/HR 的原文）
+
+## 一句话
+
+DeckCraft：把一段现成材料变成一份「每页结论句都能被追问」的 10 页演示，导出的 .pptx 在 PowerPoint 里还能继续改。
+
+## 三个必填项
+
+| 项 | 值 |
+|---|---|
+| GitHub 仓库 | https://github.com/yyc2417/deckcraft （public，main） |
+| App name | **DeckCraft** |
+| Slug | **deckcraft**（完整命名空间 `@yyc2417/deckcraft`，app_id 261） |
+
+## 平台侧状态（如实写，不要美化）
+
+- 在审版本：**v1.0.4**，状态 `pending_review`（提交后一直未审，平台无 SLA）
+- **working draft 已推送且 bundle 状态 ready**，在 Developer Console 里可直接安装体验
+- 真实模型调用：`xiaomi/mimo-v2.5`，短材料回传 0 CU，5000 字长材料回传 1 CU
+- 环境里没有任何第三方 API key / base URL，AI 全部走 `anna.llm.complete`
+
+## 怎么体验（写给评审）
+
+1. 打开 https://staging.anna.partners/developer ，找到 `DeckCraft`
+2. 安装 **working draft（0.0.0-draft）**——内容与在审的 v1.0.4 一致
+3. 在对话里输入 `#deckcraft`，贴一段真实材料（周报、会议纪要、论文摘要都行）
+4. 生成后：点画布上的标题直接改字；右侧换版式/主题不消耗额度；点「导出 PPTX」
+
+## 邮件/微信正文（可直接复制）
+
+> 您好，笔试题已完成，交付信息如下：
+>
+> - GitHub 仓库：https://github.com/yyc2417/deckcraft
+> - App name：DeckCraft
+> - Slug：deckcraft（@yyc2417/deckcraft，app_id 261）
+>
+> 产品定位：把一段现成材料（周报/纪要/论文摘要）变成一份能讲的 10 页汇报，每页标题是一句可被反驳的判断句，而不是「背景/现状」这类标签。骨架确认后，换版式、换主题、调顺序都是纯前端重算，**不消耗模型额度**；导出的 .pptx 里文字是文本框、图形是形状、图表是 PowerPoint 原生图表（双击可改数据）。
+>
+> 平台侧：AI 能力全部走 `anna.llm.complete`，App 内不持有任何 API key；真实调用已跑通（模型 xiaomi/mimo-v2.5），额度消耗记录在仓库 README 的「发布状态」里。当前版本 v1.0.4 已提交审核（`pending_review`），**working draft 已推送，可在 Developer Console 里直接安装体验**：https://staging.anna.partners/developer
+>
+> 体验建议：安装 draft 后，在对话里 `#deckcraft` 贴一段您手边的真实材料，重点看两件事——标题是不是判断句、导出的 PPTX 能不能继续改。工程记录见 `docs/PLATFORM-NOTES.md`（平台踩坑）和 `docs/RELEASE.md`（发布 runbook）。
