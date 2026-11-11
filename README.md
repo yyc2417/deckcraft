@@ -6,7 +6,7 @@
 |---|---|
 | 仓库 | https://github.com/yyc2417/deckcraft |
 | App | `DeckCraft` · `@yyc2417/deckcraft` · app_id 261 |
-| 状态 | v1.0.2 已提交审核（2026-11-11 10:12）；通过后 `anna-app apps release 1.0.2` 上线 |
+| 状态 | v1.0.3 已提交审核（2026-11-11 10:52）；通过后 `anna-app apps release 1.0.3` 上线 |
 
 ![DeckCraft 编辑器](assets/listing/shot-1-editor.png)
 
@@ -134,8 +134,8 @@ node tools/shot.mjs <url> <name> [页码]   # headless 截图，同时抓 consol
 | 项 | 值 |
 |---|---|
 | App | `DeckCraft` · `@yyc2417/deckcraft` · app_id **261** |
-| 在审版本 | **v1.0.2**（2026-11-11 10:12 提交，含量纲修复与去重规则） |
-| 状态 | `pending_review`（审核无 SLA，通过后需 `anna-app apps release 1.0.2` 才上架） |
+| 在审版本 | **v1.0.3**（2026-11-11 10:52 提交，含书架与解析重试） |
+| 状态 | `pending_review`（审核无 SLA，通过后需 `anna-app apps release 1.0.3` 才上架） |
 | 额度 | 6 次真实生成（调试提示词用掉 4 次），平台每次都回传 `quotaConsumed = 0`——staging 这个模型目前不计费，因此没有可报的消耗数字 |
 
 关于「合理使用额度」：开发期用 `--no-llm` 跑 UI，只在验证完整链路时调用真模型（共 2 次），
