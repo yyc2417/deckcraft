@@ -9,13 +9,15 @@
  * 用法：node tools/real-test.mjs
  */
 
+import { writeFile } from 'node:fs/promises';
 import puppeteer from 'puppeteer-core';
 import { existsSync } from 'node:fs';
 
 const exe = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find((p) => existsSync(p));
 const root = process.argv[2] || 'http://127.0.0.1:5180/';
 
-const brief = `上周把审批流程从串行改成并行，平均完结时长从 5.2 天降到 4 小时，样本 1842 单。
+// BRIEF=... 覆盖材料，用来测英文/长文；不设则用下面这份中文默认样本。
+const brief = process.env.BRIEF || `上周把审批流程从串行改成并行，平均完结时长从 5.2 天降到 4 小时，样本 1842 单。
 主要改动：业务和财务同时收单；法务只审金额阈值以上的单；超时自动升级。
 代价是退回率没降（17%），其中 63% 是同一类字段填错。
 下一步准备把表单必填项砍掉一半，下周一给字段清单。`;
@@ -58,6 +60,10 @@ for (let i = 0; i < 120; i += 1) {
   if (slides >= 6 && !/生成中|正在生成/.test(status)) break;
   if (Date.now() - started > 180000) break;
 }
+
+// 存一份产出，供 overflow-check 用真实内容复检版式（尤其英文/长标题）
+const deckJson = await frame.evaluate(() => window.__deckcraft.getDeck());
+await writeFile('out/last-deck.json', JSON.stringify(deckJson, null, 2), 'utf-8');
 
 const titles = await frame.evaluate(() => window.__deckcraft.getDeck().slides.map((s) => `${s.type}: ${s.title || s.quote || ''}`));
 

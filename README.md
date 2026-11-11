@@ -69,6 +69,19 @@ Anna 对话 ──#mention──▶ 模型调 open_app_view(payload={brief})
 
 模型的选择、provider 路由、计费都在平台侧，App 只描述"要什么"；一次生成实际花了多少额度由 `_meta.quotaConsumed` 回传，界面右下角有累计显示——这个数字是真实消耗，不是估算。
 
+### 语言跟随材料，由代码判定而不是靠模型自觉
+
+提示词里写一句「跟随材料语言」不够——实测英文材料仍然输出中文，因为中文 system prompt 加中文 schema 的惯性太强。
+现在 `detectLang()` 在发起调用前判定材料语言（CJK 与拉丁字母占比），把结论作为硬指令放在 user 消息第一行，
+英文材料出来的是整套英文（标题、要点、图表分类、系列名、结尾）。中英混排按正文主体语言走。
+
+### 额度耗尽不是白屏
+
+平台回传 `quota_exceeded` / `rate_limited` 时，App 不会把用户留在空白画布上：它会加载内置样张，
+画布上方常驻横幅写明原因（「额度不足」「请求太频繁，被平台限流」），状态栏同样说明，避免用户以为是自己操作失败。
+这条路径没法靠真实调用复现，用 `?simulate=quota_exceeded`（或 iframe 内 `sessionStorage['deckcraft:simulate']`）验证——
+`bundle/js/llm.js` 里读这个开关，只影响失败分支，正常生成不受影响。
+
 ### 模型由账号决定，不由 App 决定
 
 App 调 `anna.llm.complete` 时不传 `modelPreferences`——平台模型选择的优先级是
@@ -123,6 +136,7 @@ node tools/shot.mjs <url> <name> [页码]   # headless 截图，同时抓 consol
 | 三主题导出 | `npm run smoke` | 各 12 页 / 226 KB / 157 个图形 |
 | 图元是否跑出画布 | `python tools/check-pptx.py out/*.pptx` | 0 处越界 |
 | 文本是否溢出文本框 | `node tools/overflow-check.mjs` | 正常 + 压力两轮，0 处 |
+| 真实产出是否溢出 | `node tools/overflow-deck.mjs out/last-deck.json` | 英文材料 8 页，0 处 |
 | 端到端（本地 harness：宿主握手 / 生成 / 存储往返 / 导出） | `node tools/flow-test.mjs` | 6 项全过（**非平台真机**） |
 | 版式互转是否丢内容 | 手测 5 条路径 | 内容保留，无报错 |
 | **平台真实模型调用** | `node tools/real-test.mjs` | `xiaomi/mimo-v2.5`，8 页 / 15–40 秒；短材料回传 0 CU，5000 字长材料回传 **1 CU** |

@@ -418,19 +418,25 @@ async function generate() {
     }
     $('#composer').classList.add('is-collapsed');
   } catch (err) {
-    // 模型不可用（本地预览 / 宿主没接模型）时不把用户卡在错误上：
-    // 先给一份能看的示例，再说清楚为什么。评审第一次点开就看得到东西，
-    // 比"报错了但界面很诚实"重要。
-    if (err.code === 'not_implemented' || err.code === 'llm_disabled' || err.code === 'no_llm') {
+    // 模型不可用（本地预览 / 宿主没接模型 / 额度耗尽 / 限流）时不把用户卡在错误上：
+    // 先给一份能看的示例，再说清楚为什么。额度耗尽和"没接模型"是同一类处境——
+    // 用户此刻都无法拿到真内容，给他一张空白画布 + 一句报错没有任何用处。
+    const soft = ['not_implemented', 'llm_disabled', 'no_llm', 'quota_exceeded', 'insufficient_quota', 'budget_exceeded', 'rate_limited'];
+    if (soft.includes(err.code)) {
       try {
         const raw = await mockGenerate({ theme, onProgress: (i, n) => setStatus(`模型未接入，先用示例占位 ${i}/${n}`) });
         state.deck = normalizeDeck({ ...raw, theme, brief, scene: state.scene });
         state.selected = 0;
         renderAll();
         await persistNow();
-        setBanner('示例数据 · 当前环境没有接入平台模型，这里是内置样张');
-        setStatus('当前环境没有接入模型，已加载示例内容（版式与真实生成一致）');
-        toast('模型没接上：这份是示例。真实生成需要在 Anna 里打开本应用。');
+        const why = err.code === 'quota_exceeded' || err.code === 'insufficient_quota' || err.code === 'budget_exceeded'
+          ? '额度不足'
+          : err.code === 'rate_limited'
+            ? '请求太频繁，被平台限流'
+            : '当前环境没有接入平台模型';
+        setBanner(`示例数据 · ${why}，这里是内置样张`);
+        setStatus(`${why}，已加载示例内容（版式与真实生成一致）`);
+        toast(`${why}：这份是示例，恢复后再点生成即可。`);
         return;
       } catch (_) {
         /* 连示例都失败就退回普通错误提示 */
@@ -1463,7 +1469,9 @@ window.__deckcraft = {
   },
   persistNow,
   restore,
-  storageReady: () => Boolean(state.anna && state.anna.storage)
+  storageReady: () => Boolean(state.anna && state.anna.storage),
+  // 内部钩子：让脚本能替换宿主对象，验证额度/限流这类拿不到的错误分支
+  _host: () => state.anna
 };
 
 boot();

@@ -57,7 +57,10 @@ const RULES = `写作要求（按重要性排序）：
 
 5. 最后一页 end 不要写「谢谢聆听」，写具体的下一步动作或待讨论的问题。
 
-6. 全文语言与材料一致（中文材料用中文），专有名词保留英文原文，不要翻译。
+6. **语言完全跟随材料**：材料是英文，全部输出英文（标题、要点、图表分类、结尾都一样），
+   不要翻译成中文；材料是中文就用中文；中英混排时按正文主体语言走。
+   字数上限（≤N 字）对英文按"词"宽松理解，宁可短也不要为了凑字数拆句。
+   专有名词保留原文，不要翻译。
 
 7. 页数必须正好等于用户要求的数字（含封面和结尾页）。少一页都算不合格：
    如果写完发现只有 N-2 页，说明每页塞得太满，把信息拆开补足，不要少给。
@@ -92,14 +95,35 @@ function sceneLine(scene) {
 }
 
 /** 生成整份 deck 的消息。 */
+/**
+ * 判断材料主体语言。
+ *
+ * 为什么要在 JS 里判定、而不是只写一句"跟随材料"：实测把规则写进 system 后，
+ * 英文材料仍然输出中文——中文 system + 中文 schema 的惯性太强。改成由代码判定，
+ * 再把结论作为硬指令放在最前面，模型就没有选择余地。
+ */
+export function detectLang(text) {
+  const s = String(text || '');
+  const cjk = (s.match(/[\u3000-\u9fff\uff00-\uffef]/g) || []).length;
+  const latin = (s.match(/[A-Za-z]/g) || []).length;
+  if (!cjk && !latin) return 'zh';
+  return cjk >= latin * 0.2 ? 'zh' : 'en';
+}
+
 export function buildDeckMessages({ brief, scene, slides = 8, extra = '' }) {
   const material = String(brief || '').trim();
+  const lang = detectLang(material);
+  const langRule = lang === 'en'
+    ? 'OUTPUT LANGUAGE: English. Write every user-visible string in English — slide titles, body text, category labels, series names, notes, the deck title and subtitle. Do not translate to Chinese. Keep product and paper names as-is.'
+    : 'OUTPUT LANGUAGE: 中文。所有面向读者的文字（标题、正文、图表分类、系列名、备注）都用中文。';
   const system = [
     '你是一位给技术团队写汇报的叙事顾问。你写的每一页都要能被追问，而不是好看。',
-    '你的输出会被程序直接解析成幻灯片，任何多余字符都会导致解析失败。'
+    '你的输出会被程序直接解析成幻灯片，任何多余字符都会导致解析失败。',
+    langRule
   ].join('\n');
 
   const user = [
+    langRule,
     `请为下面这份材料做一份 ${slides} 页的演示文稿。`,
     sceneLine(scene),
     extra ? `额外要求：${extra}` : '',

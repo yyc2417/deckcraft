@@ -22,6 +22,17 @@ export function hasLlm(anna) {
  * maxTokens 上限：同步通道 8192。给 6000 留出余量，避免被截断后 JSON 半截。
  */
 export async function completeJSON(anna, messages, { maxTokens = DEFAULT_MAX_TOKENS } = {}) {
+  // ?simulate=<code> 用来验证失败分支（额度耗尽、限流）。
+  // 这些错误只能由平台回传，正常开发时不可能复现；没有这个开关，
+  // 降级路径就永远是"写了但没验过"的代码。
+  const sim =
+    new URLSearchParams(location.search).get('simulate') ||
+    (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('deckcraft:simulate'));
+  if (sim) {
+    const err = new HostError(sim, sim === 'quota_exceeded' ? '额度不足，无法继续生成' : '模拟的模型错误');
+    throw err;
+  }
+
   if (!hasLlm(anna)) {
     throw new HostError('no_llm', '当前没有可用的模型（本地预览模式）');
   }
