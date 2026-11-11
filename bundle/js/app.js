@@ -406,8 +406,11 @@ async function generate() {
     } else {
       const used = state.lastCall && state.lastCall.quota;
       const model = state.lastCall && state.lastCall.model;
+      const got = state.deck.slides.length;
+      const want = state.slideCount;
       setStatus(
-        `已生成 ${state.deck.slides.length} 页` +
+        `已生成 ${got} 页` +
+          (got === want ? '' : `（设的是 ${want} 页，模型没对齐，可手动删）`) +
           (model ? ` · ${model}` : '') +
           (used ? ` · 消耗 ${Math.round(used)} CU` : '') +
           ' · 标题可直接改'
