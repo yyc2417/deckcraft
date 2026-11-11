@@ -2,7 +2,7 @@
 
 把一段材料变成一份**能讲的**演示文稿，导出真 `.pptx`。
 
-Anna App · 在 [Anna staging](https://staging.anna.partners) 里搜 DeckCraft，或在对话里 `#deckcraft` 直接叫出来。
+Anna App（manifest `deckcraft`，name `DeckCraft`）· 本地已跑通，发布状态见 [docs/RELEASE.md](docs/RELEASE.md)。
 
 ![DeckCraft 编辑器](assets/listing/shot-1-editor.png)
 
@@ -111,10 +111,10 @@ node tools/shot.mjs <url> <name> [页码]   # headless 截图，同时抓 consol
 | 三主题导出 | `npm run smoke` | 各 12 页 / 226 KB / 157 个图形 |
 | 图元是否跑出画布 | `python tools/check-pptx.py out/*.pptx` | 0 处越界 |
 | 文本是否溢出文本框 | `node tools/overflow-check.mjs` | 正常 + 压力两轮，0 处 |
-| 端到端（宿主 / 生成 / 存储 / 导出） | `node tools/flow-test.mjs` | 6 项全过 |
+| 端到端（本地 harness：宿主握手 / 生成 / 存储往返 / 导出） | `node tools/flow-test.mjs` | 6 项全过（**非平台真机**） |
 | 版式互转是否丢内容 | 手测 5 条路径 | 内容保留，无报错 |
 
-真实模型调用与上架流程见 [docs/RELEASE.md](docs/RELEASE.md)。
+上表全部在本地跑。**平台侧的三件事尚未完成**：真实模型调用、额度消耗记录、上架发布——步骤与验收标准见 [docs/RELEASE.md](docs/RELEASE.md)，`node tools/compliance-check.mjs` 会把它们列为待证明项而不是通过。
 
 ## 目录
 
