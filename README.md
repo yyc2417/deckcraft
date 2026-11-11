@@ -103,6 +103,19 @@ node tools/overflow-check.mjs            # 逐页量文本溢出（正常内容 
 node tools/shot.mjs <url> <name> [页码]   # headless 截图，同时抓 console 报错
 ```
 
+## 验过什么
+
+| 检查 | 命令 | 结果 |
+|---|---|---|
+| manifest + bundle 静态检查 | `anna-app validate --strict` | 通过 |
+| 三主题导出 | `npm run smoke` | 各 12 页 / 226 KB / 157 个图形 |
+| 图元是否跑出画布 | `python tools/check-pptx.py out/*.pptx` | 0 处越界 |
+| 文本是否溢出文本框 | `node tools/overflow-check.mjs` | 正常 + 压力两轮，0 处 |
+| 端到端（宿主 / 生成 / 存储 / 导出） | `node tools/flow-test.mjs` | 6 项全过 |
+| 版式互转是否丢内容 | 手测 5 条路径 | 内容保留，无报错 |
+
+真实模型调用与上架流程见 [docs/RELEASE.md](docs/RELEASE.md)。
+
 ## 目录
 
 ```
@@ -121,8 +134,9 @@ bundle/
   js/theme.js          主题令牌
   js/mock.js           离线示例数据
   vendor/              PptxGenJS 4.0.1（MIT）
-tools/                 冒烟、几何检查、截图、图标生成
-docs/                  DESIGN.md（产品取舍）· PLATFORM-NOTES.md（平台踩坑）
+tools/                 冒烟、几何检查、溢出检查、截图、图标生成、任意 deck 渲染
+  fixtures/            两份非汇报题材的验证稿（产品发布 / 论文答辩）
+docs/                  DESIGN.md（产品取舍）· PLATFORM-NOTES.md（平台踩坑）· RELEASE.md（发布 runbook）
 ```
 
 ## 已知限制
