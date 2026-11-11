@@ -22,7 +22,7 @@ const brief = `上周把审批流程从串行改成并行，平均完结时长�
 
 const browser = await puppeteer.launch({ executablePath: exe, headless: 'new', args: ['--no-sandbox'] });
 const page = await browser.newPage();
-await page.setViewport({ width: 1400, height: 900 });
+await page.setViewport({ width: Number(process.env.VW || 1400), height: Number(process.env.VH || 900) });
 
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
@@ -59,6 +59,8 @@ for (let i = 0; i < 120; i += 1) {
   if (Date.now() - started > 180000) break;
 }
 
+const titles = await frame.evaluate(() => window.__deckcraft.getDeck().slides.map((s) => `${s.type}: ${s.title || s.quote || ''}`));
+
 const result = await frame.evaluate(() => ({
   title: document.getElementById('docTitle').textContent.trim(),
   status: document.getElementById('statusText').textContent.trim(),
@@ -67,7 +69,26 @@ const result = await frame.evaluate(() => ({
   slideTypes: Array.from(document.querySelectorAll('#thumbs .thumb')).length
 }));
 
+// THUMBS=4,7 → 同一次生成里截多页，保证商店图内容前后一致
+const wanted = String(process.env.THUMBS || process.env.THUMB || '').split(',').map((x) => Number(x)).filter(Boolean);
+for (const n of wanted) {
+  await frame.evaluate((i) => document.querySelector(`#thumbs .thumb:nth-child(${i})`).click(), n);
+  await new Promise((r) => setTimeout(r, 600));
+  const el = await page.$('iframe');
+  if (el) await el.screenshot({ path: `out/listing-${n}.png` });
+}
+if (wanted.length) {
+  await frame.evaluate(() => document.querySelector('#thumbs .thumb:nth-child(1)').click());
+  await new Promise((r) => setTimeout(r, 500));
+}
+
 await page.screenshot({ path: 'out/real-test.png' });
+// 只截 iframe：商店图不要 mock dashboard 的外壳
+const frameEl = await page.$('iframe');
+if (frameEl) {
+  await frameEl.screenshot({ path: 'out/listing-real.png' });
+}
 await browser.close();
 
 console.log(JSON.stringify({ ...result, seconds: Math.round((Date.now() - started) / 1000), before, errors: errors.slice(0, 3) }, null, 2));
+if (process.env.TITLES) console.log('\n' + titles.join('\n'));
