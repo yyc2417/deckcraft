@@ -6,7 +6,7 @@
 |---|---|
 | 仓库 | https://github.com/yyc2417/deckcraft |
 | App | `DeckCraft` · `@yyc2417/deckcraft` · app_id 261 |
-| 状态 | v1.0.3 已提交审核（2026-11-11 10:52）；通过后 `anna-app apps release 1.0.3` 上线 |
+| 线上版本 | **v1.0.4 已上架**（2026-11-11 17:37 发布，审核历时约 7.5 小时） |
 
 ![真实生成录屏：贴入材料 → 平台模型生成 8 页 → 翻页检查](assets/listing/demo.gif)
 
@@ -152,8 +152,8 @@ node tools/shot.mjs <url> <name> [页码]   # headless 截图，同时抓 consol
 | 项 | 值 |
 |---|---|
 | App | `DeckCraft` · `@yyc2417/deckcraft` · app_id **261** |
-| 在审版本 | **v1.0.3**（2026-11-11 10:52 提交，含书架与解析重试） |
-| 状态 | `pending_review`（审核无 SLA，通过后需 `anna-app apps release 1.0.3` 才上架） |
+| 待上线版本 | **v1.1.0**（演讲备注 / 语言跟随 / 额度降级 / 书架）——已提交 release review，等管理员批准后自动上线 |
+| 状态 | `published`。经验记录：首次审核约 7.5 小时无 SLA；**后续版本的 release 也要管理员批一道**（文档没写，CLI 回执明确说了），批准期间旧版继续服务 |
 | 额度 | 10 次真实生成，多数回传 `quotaConsumed = 0`，一次 5000 字长材料回传 **1 CU**（staging 这个模型的计费很轻） |
 
 关于「合理使用额度」：开发期用 `--no-llm` 跑 UI，只在验证完整链路时调用真模型（共 2 次），
