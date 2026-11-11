@@ -11,7 +11,7 @@
 
 import { call, HostError } from './sdk.js';
 
-const DEFAULT_MAX_TOKENS = 6000;
+const DEFAULT_MAX_TOKENS = 7600; // 同步通道上限 8192，留 600 给信封与拒答
 
 export function hasLlm(anna) {
   return Boolean(anna && anna.llm && typeof anna.llm.complete === 'function');
@@ -47,7 +47,22 @@ export async function completeJSON(anna, messages, { maxTokens = DEFAULT_MAX_TOK
   const text = extractText(result);
   if (!text) throw new HostError('empty_response', '模型返回了空内容');
 
-  const json = extractJson(text);
+  // 留着原始响应：解析失败时这是唯一的诊断材料（界面看不到 console）
+  try {
+    window.__lastRaw = text;
+  } catch (_) {
+    /* 非浏览器环境忽略 */
+  }
+
+  let json;
+  try {
+    json = extractJson(text);
+  } catch (err) {
+    err.raw = text.slice(0, 2000);
+    err.rawLength = text.length;
+    err.stopReason = result.stopReason;
+    throw err;
+  }
   return {
     json,
     text,

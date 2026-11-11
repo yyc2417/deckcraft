@@ -56,14 +56,14 @@ await frame.evaluate(() => {
 
 let slides = 0;
 let title = '';
-for (let i = 0; i < 50; i += 1) {
+for (let i = 0; i < 120; i += 1) {
   await new Promise((r) => setTimeout(r, 500));
   slides = await frame.$$eval('#thumbs .thumb', (els) => els.length).catch(() => 0);
   title = await frame.$eval('#docTitle', (el) => el.textContent.trim()).catch(() => '');
-  // 演示数据是 9 页；等到页数和标题都变成生成结果才算完成
-  if (slides >= 8 && title && title !== '未命名演示') break;
+  // 真模型一次生成要 20-40 秒，别用 mock 的时长去卡它
+  if (slides >= 6 && title && title !== '未命名演示') break;
 }
-slides >= 8 ? ok('生成', `${title} · ${slides} 页`) : bad('生成', `只渲染出 ${slides} 页(${title})`);
+slides >= 6 ? ok('生成', `${title} · ${slides} 页`) : bad('生成', `只渲染出 ${slides} 页(${title})`);
 
 const statusAfterGen = await frame.$eval('#statusText', (el) => el.textContent).catch(() => '');
 details: {

@@ -29,6 +29,8 @@ const NO_FIT = new URLSearchParams(location.search).has('nofit');
 const state = {
   anna: null,
   deck: null,
+  shelf: [],        // 书架：最近打开过的几份演示（含当前这份）
+  SHELF_MAX: 6,
   selected: 0,
   busy: false,
   quota: null,
@@ -128,11 +130,73 @@ let saveTimer = null;
 async function persistNow() {
   if (!state.deck || !state.anna) return;
   clearTimeout(saveTimer);
+  upsertShelf(state.deck);
   try {
     await call(state.anna.storage.set, { key: 'deck:current', value: state.deck });
+    // 书架和当前稿分开存：单键太大时 legacy 的 256KB 上限会先炸书架
+    await call(state.anna.storage.set, { key: 'decks:shelf', value: state.shelf });
   } catch (err) {
     console.warn('[deckcraft] 保存失败', err);
   }
+}
+
+/** 把一份 deck 放进书架（同 id 覆盖），超出上限丢最旧的，但永不丢当前这份。 */
+function upsertShelf(deck) {
+  if (!deck || !deck.id) return;
+  const entry = JSON.parse(JSON.stringify(deck));
+  entry.updatedAt = new Date().toISOString();
+  const rest = state.shelf.filter((d) => d.id !== deck.id);
+  const next = [entry, ...rest];
+  while (next.length > state.SHELF_MAX) next.pop();
+  state.shelf = next;
+  renderShelf();
+}
+
+/** 切换书架里的一份；切换前先把当前这份存回书架，避免丢改动。 */
+async function openFromShelf(id) {
+  if (!id || (state.deck && state.deck.id === id)) return;
+  if (state.deck) {
+    upsertShelf(state.deck);
+    await persistNow();
+  }
+  const target = state.shelf.find((d) => d.id === id);
+  if (!target) return;
+  state.deck = normalizeDeck(target);
+  state.selected = 0;
+  renderAll();
+  await persistNow();
+  setStatus(`已打开「${state.deck.title}」`);
+}
+
+/** 顶栏的书架下拉：当前这份 + 其他几份。 */
+function renderShelf() {
+  const sel = $('#shelf');
+  if (!sel) return;
+  sel.innerHTML = '';
+  const seen = new Set();
+  const items = [];
+  if (state.deck) {
+    items.push(state.deck);
+    seen.add(state.deck.id);
+  }
+  for (const d of state.shelf) {
+    if (!seen.has(d.id)) {
+      items.push(d);
+      seen.add(d.id);
+    }
+  }
+  for (const d of items) {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    const when = d.updatedAt ? new Date(d.updatedAt) : null;
+    const stamp = when && !Number.isNaN(when.getTime())
+      ? `${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}`
+      : '';
+    opt.textContent = `${d.title || '未命名'}${stamp ? ' · ' + stamp : ''}`;
+    if (state.deck && d.id === state.deck.id) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  sel.disabled = items.length < 2;
 }
 
 /** 打字时用防抖，避免每次按键都过一次 RPC。 */
@@ -144,16 +208,32 @@ function saveDeck() {
 
 async function restore() {
   if (!state.anna) return false;
+  // 书架优先；老版本只存了 deck:current，作为兼容分支保留
+  try {
+    const shelfRes = await call(state.anna.storage.get, { key: 'decks:shelf' });
+    const shelf = shelfRes && shelfRes.value;
+    if (Array.isArray(shelf) && shelf.length) {
+      state.shelf = shelf.filter((d) => d && d.id && Array.isArray(d.slides)).slice(0, state.SHELF_MAX);
+    }
+  } catch (_) {
+    state.shelf = [];
+  }
   try {
     const res = await call(state.anna.storage.get, { key: 'deck:current' });
     const value = res && res.value;
     if (value && Array.isArray(value.slides) && value.slides.length) {
       state.deck = normalizeDeck(value);
       state.scene = state.deck.scene || 'report';
+      upsertShelf(state.deck);
       return true;
     }
   } catch (_) {
     /* 没有历史记录是正常情况 */
+  }
+  if (state.shelf.length) {
+    state.deck = normalizeDeck(state.shelf[0]);
+    renderShelf();
+    return true;
   }
   return false;
 }
@@ -174,6 +254,11 @@ function buildTopbar() {
         onclick: () => setTheme(id)
       })
     );
+  });
+
+  const shelf = $('#shelf');
+  shelf.addEventListener('change', (e) => {
+    openFromShelf(e.target.value);
   });
 
   $('#btnExport').addEventListener('click', doExport);
@@ -254,14 +339,16 @@ function loadSample() {
 
 async function resetDeck() {
   if (state.busy) return;
-  const ok = state.deck && state.deck.slides.length > 1
-    ? window.confirm('新建会丢掉当前这份演示，确定？')
-    : true;
-  if (!ok) return;
+  // 不再问"确定要丢掉吗"：当前这份会先存进书架，随时能切回来
+  if (state.deck) {
+    upsertShelf(state.deck);
+    await persistNow();
+  }
   state.deck = emptyDeck(state.deck ? state.deck.theme : 'slate');
   state.selected = 0;
   renderAll();
-  persistNow();
+  await persistNow();
+  setStatus(`已新建一份；上一份「${state.shelf[1] ? state.shelf[1].title : '—'}」在顶栏书架里`);
 }
 
 /* ============================ 生成 ============================ */
@@ -284,7 +371,16 @@ async function generate() {
     if (hasLlm(state.anna)) {
       setStatus('正在生成结构…');
       const messages = buildDeckMessages({ brief, scene: state.scene, slides: state.slideCount });
-      const out = await completeJSON(state.anna, messages, { maxTokens: 6000 });
+      // 解析失败多半是输出被截断或手滑写了非法 JSON。重试一次比让用户看到
+      // "格式不对"好得多——模型第二次通常就正常了，而用户只多等十几秒。
+      let out;
+      try {
+        out = await completeJSON(state.anna, messages, { maxTokens: 7600 });
+      } catch (err) {
+        if (err.code !== 'bad_json') throw err;
+        setStatus('模型这次没给出合法结构，重试一次…');
+        out = await completeJSON(state.anna, messages, { maxTokens: 7900 });
+      }
       raw = out.json;
       if (out.quota) {
         state.quota = (state.quota || 0) + Number(out.quota || 0);
@@ -391,6 +487,7 @@ function renderAll() {
   renderCanvas(theme);
   renderInspector();
   renderStatus();
+  renderShelf();
 }
 
 function renderRail(theme) {
