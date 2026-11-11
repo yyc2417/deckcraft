@@ -42,4 +42,4 @@ DeckCraft：把一段现成材料变成一份「每页结论句都能被追问�
 >
 > 平台侧：AI 能力全部走 `anna.llm.complete`，App 内不持有任何 API key；真实调用已跑通（模型 xiaomi/mimo-v2.5），额度消耗记录在仓库 README 的「发布状态」里。当前版本 v1.0.4 已提交审核（`pending_review`，平台审核无 SLA）；审核通过前可先看仓库 README 顶部的真实生成录屏，通过后用 App name `DeckCraft` 直接安装。
 >
-> 体验建议：安装 draft 后，在对话里 `#deckcraft` 贴一段您手边的真实材料，重点看两件事——标题是不是判断句、导出的 PPTX 能不能继续改。工程记录见 `docs/PLATFORM-NOTES.md`（平台踩坑）和 `docs/RELEASE.md`（发布 runbook）。
+> 体验建议：现在可以先看仓库 README 顶部的真实生成录屏；管理员 approve 后用 App name `DeckCraft` 直接安装，贴一段手边材料试一次，重点看两件事——标题是不是判断句、导出的 PPTX 能不能继续改。工程记录见 `docs/PLATFORM-NOTES.md`（平台踩坑）和 `docs/RELEASE.md`（发布 runbook）。
