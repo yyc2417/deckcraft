@@ -30,6 +30,7 @@ const LIMITS = {
   note: 70,
   quote: 150,
   insight: 90,
+  notes: 240,
   meta: 60
 };
 
@@ -68,7 +69,14 @@ function normColumn(col) {
 function normSlide(raw) {
   const s = raw && typeof raw === 'object' ? raw : {};
   const type = SLIDE_TYPES.includes(s.type) ? s.type : 'points';
-  const base = { id: s.id || uid(), type, kicker: str(s.kicker, LIMITS.kicker), title: str(s.title, LIMITS.title) };
+  // notes 放在 base 里：演讲备注与版式无关，所有类型都该有，换版式时也不能丢
+  const base = {
+    id: s.id || uid(),
+    type,
+    kicker: str(s.kicker, LIMITS.kicker),
+    title: str(s.title, LIMITS.title),
+    notes: str(s.notes, LIMITS.notes)
+  };
 
   if (type === 'cover') {
     return { ...base, subtitle: str(s.subtitle, LIMITS.subtitle), meta: str(s.meta, LIMITS.meta) };

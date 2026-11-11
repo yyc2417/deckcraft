@@ -30,6 +30,9 @@ export async function buildPptx(PptxGenJS, deck, theme, framesForSlide) {
       else if (f.t === 'line') addLine(s, pptx, f);
       else if (f.t === 'chart') addChart(s, pptx, f, theme);
     }
+    // 演讲备注写进 notesSlide。这是导出的"另一半"：幻灯片给人看，备注给自己讲。
+    // 没有备注的话，用户还得把讲稿另存一份，导出就不算真的完成。
+    if (slide.notes) s.addNotes(slide.notes);
   }
 
   const out = await pptx.write({ outputType: 'base64' });

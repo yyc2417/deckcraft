@@ -27,6 +27,10 @@ let failed = 0;
 
 for (const themeId of THEME_IDS) {
   const raw = mockDeck(themeId);
+  // 顺便覆盖演讲备注：没有备注的导出等于半成品，冒烟里必须有一条带备注的路径
+  raw.slides.forEach((sl, i) => {
+    sl.notes = `第 ${i + 1} 页口播：这里停一下，把刚才那个数字再念一遍。`;
+  });
   const deck = normalizeDeck(raw, themeId);
   const theme = getTheme(themeId);
 

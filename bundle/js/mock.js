@@ -133,8 +133,23 @@ export function mockDeck(theme = 'slate') {
 }
 
 /** 模拟一次带进度的生成，用于没有模型时的演示。 */
+// 示例稿的备注：内容刻意写成"怎么讲"而不是"页面上写了什么"，
+// 让用户第一次点开就知道备注栏该填什么。
+const SAMPLE_NOTES = {
+  cover: '先别急着讲内容，说清楚这次汇报只要一个决定：字段清单砍不砍。',
+  agenda: '这一页只花 20 秒，让他们知道后面还有多久。',
+  points: '停一下，问他们上一次被追问是在哪一页。',
+  table: '强调"只改标题"这一行——20 分钟就能做，先从这个开始。',
+  split: '把 3 降到 1 这个数字念出来，然后闭嘴两秒。',
+  chart: '不要说"如图所示"，直接说结论：信息越密，追问越多。',
+  end: '落到具体动作和日期，不要用"谢谢聆听"收尾。'
+};
+
 export async function mockGenerate({ theme = 'slate', onProgress } = {}) {
   const deck = mockDeck(theme);
+  deck.slides.forEach((sl) => {
+    if (!sl.notes && SAMPLE_NOTES[sl.type]) sl.notes = SAMPLE_NOTES[sl.type];
+  });
   const total = deck.slides.length;
   for (let i = 1; i <= total; i += 1) {
     if (onProgress) onProgress(i, total);

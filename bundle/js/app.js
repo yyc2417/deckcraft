@@ -636,7 +636,34 @@ function renderInspector() {
     body.appendChild(field('出处', textInput(slide, 'attribution', '谁说的')));
   }
 
+  body.appendChild(notesBlock(slide));
   body.appendChild(aiRewriteBlock());
+}
+
+/** 演讲备注：不进画面，只进 PPTX 的备注栏和自己讲的时候看。
+ *  刻意放在面板最后——它是"准备讲"的时候才需要，不是排版时需要的。 */
+function notesBlock(slide) {
+  const ta = h('textarea', {
+    class: 'input notes-input',
+    rows: '3',
+    placeholder: '讲这页时说的一句话，不写"见上文"这种废话。导出后进 PowerPoint 备注栏。',
+    oninput: (e) => {
+      slide.notes = e.target.value;
+      saveDeck();
+    },
+    onblur: () => renderInspector()
+  }, slide.notes || '');
+
+  const wrap = h('div', {}, [field('演讲备注（≤240 字）', ta)]);
+  const count = h('span', { class: 'hint' });
+  const paint = () => {
+    const n = (slide.notes || '').length;
+    count.textContent = n ? `${n} 字 · 导出后在备注栏` : '可空';
+  };
+  ta.addEventListener('input', paint);
+  paint();
+  ta.insertAdjacentElement('afterend', count);
+  return wrap;
 }
 
 function slideActions(slide) {
