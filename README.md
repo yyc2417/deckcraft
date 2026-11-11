@@ -113,8 +113,21 @@ node tools/shot.mjs <url> <name> [页码]   # headless 截图，同时抓 consol
 | 文本是否溢出文本框 | `node tools/overflow-check.mjs` | 正常 + 压力两轮，0 处 |
 | 端到端（本地 harness：宿主握手 / 生成 / 存储往返 / 导出） | `node tools/flow-test.mjs` | 6 项全过（**非平台真机**） |
 | 版式互转是否丢内容 | 手测 5 条路径 | 内容保留，无报错 |
+| **平台真实模型调用** | `node tools/real-test.mjs` | `xiaomi/mimo-v2.5`，8 页 / 15 秒；`_meta.quotaConsumed` 回传 **0** |
 
-上表全部在本地跑。**平台侧的三件事尚未完成**：真实模型调用、额度消耗记录、上架发布——步骤与验收标准见 [docs/RELEASE.md](docs/RELEASE.md)，`node tools/compliance-check.mjs` 会把它们列为待证明项而不是通过。
+除最后一行外，其余都在本地跑。平台侧进度见下面的「发布状态」。
+
+## 发布状态
+
+| 项 | 值 |
+|---|---|
+| App | `DeckCraft` · `@yyc2417/deckcraft` · app_id **261** |
+| 在审版本 | **v1.0.1**（2026-11-11 09:58 提交） |
+| 状态 | `pending_review`（审核无 SLA，通过后需 `anna-app apps release 1.0.1` 才上架） |
+| 额度 | 两次真实生成，平台回传 `quotaConsumed = 0`——staging 这个模型目前不计费，所以没有可报的消耗数字 |
+
+关于「合理使用额度」：开发期用 `--no-llm` 跑 UI，只在验证完整链路时调用真模型（共 2 次），
+这个策略写在 [docs/DESIGN.md](docs/DESIGN.md) 的额度小节里。
 
 ## 目录
 
