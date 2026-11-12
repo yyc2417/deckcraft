@@ -89,3 +89,27 @@ uvx anna-app-runtime-local@0.2.0a33 --help
 **原因**：`apps push`（工作草稿）→ `apps cut <version>`（冻结不可变版本）→ `apps submit-review`（提交审核）→ 管理员 approve → `apps release` 才真正上线。审核没有 SLA。
 
 **解法**：把 listing 文案、图标、截图在提交前一次做全，把审核排到最早的可行时间点；通过前可以用 working draft 直接装到自己账号上做真机验证。
+
+## 11. 审核实测：无 SLA，首次 7.5 小时，新版本 release 也要再批一道
+
+**现象**：v1.0.4 于 09:58 首次 `submit-review`，17:37 才被 approve + publish，中间无任何进度反馈；随后 `release 1.1.0` 时 CLI 回执说「it goes live once an admin approves; the current live version keeps serving users」——**每个新版本的发布都要管理员再批一道**，这一点所有文档都没写，只有实测才知道。
+
+**原因**：staging 环境没有审核队列的 SLA 或自动任务，管理员上班时间人工处理；夜间和周末完全不流动。
+
+**解法**：① 提交审核放在一天里最早的可行时间点；② 审批期间旧版本继续服务，所以发新版永远是安全的（最坏结果是排队）；③ 不要相信「过审后发版免审」的推断——文档的沉默不是许可。
+
+## 12. PENDING_REVIEW 期间重钉候选版本 = 重新排队
+
+**现象**：为赶进度切了 4 次版本（1.0.0→1.0.4）并各自 `submit-review`，每次都「Switch review candidate」并重跑预检；总等待时间因此被拉长。
+
+**原因**：平台允许在 PENDING_REVIEW 中换候选，但每次换钉都是一次新的提交动作。
+
+**解法**：审核挂起期间冻结版本，改动全部进仓库，攒成一个版本一次提交。改一个 typo 不值得重排一次队。
+
+## 13. DRAFT 只有作者自己可见，评审装不了
+
+**现象**：交付说明里想让评审「在 Developer Console 装 working draft 体验」——做不到。
+
+**原因**：平台状态机里 `DRAFT` 的定义就是 "Not visible to anyone but you"；`PENDING_REVIEW` 时商店详情页对评审可见但只展示 candidate 的工具绑定；真正的「别人可装」要等 `APPROVED`（商店搜不到但 direct lookup 可装）或 `PUBLISHED`。
+
+**解法**：pending 期间给别人看效果，唯一诚实的方式是仓库里放真实生成的录屏/截图（`tools/real-test.mjs` 的 `RECORD=` 出帧、PIL 拼 GIF）。注意 Puppeteer 在模型生成期间截不到帧（CDP 拿不到画面），只能在生成前后等确定节点截。
